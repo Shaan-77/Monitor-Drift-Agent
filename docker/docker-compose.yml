@@ -1,0 +1,97 @@
+# Docker Compose configuration for Monitor/Drift Agent
+version: '3.8'
+
+services:
+  # Monitor/Drift Agent service
+  agent:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: monitor_drift_agent
+    restart: unless-stopped
+    environment:
+      # Database configuration
+      - DATABASE_URL=postgresql://monitor_drift:password@postgres:5432/monitor_drift
+      
+      # Metric collection settings
+      - METRIC_COLLECTION_INTERVAL=60
+      
+      # Threshold settings
+      - DEFAULT_CPU_THRESHOLD=80.0
+      - DEFAULT_MEMORY_THRESHOLD=80.0
+      - DEFAULT_DISK_THRESHOLD=80.0
+      
+      # Cloud provider credentials (set via .env file or secrets)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      
+      # Alert channel configuration
+      - EMAIL_SMTP_SERVER=${EMAIL_SMTP_SERVER:-}
+      - EMAIL_SMTP_PORT=${EMAIL_SMTP_PORT:-587}
+      - EMAIL_USERNAME=${EMAIL_USERNAME:-}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      
+      # Feature flags
+      - ANOMALY_DETECTION_ENABLED=true
+      - ML_DETECTION_ENABLED=false
+      - SELF_HEALING_ENABLED=false
+      
+      # API settings
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_DEBUG=false
+      
+      # Logging
+      - LOG_LEVEL=INFO
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../logs:/app/logs
+      - ../data:/app/data
+    depends_on:
+      - postgres
+    networks:
+      - monitor_drift_network
+
+  # PostgreSQL database service
+  postgres:
+    image: postgres:15-alpine
+    container_name: monitor_drift_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=monitor_drift
+      - POSTGRES_USER=monitor_drift
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # TODO: Add database initialization scripts if needed
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - monitor_drift_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monitor_drift"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optional: Redis for caching (if needed)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: monitor_drift_redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   networks:
+  #     - monitor_drift_network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  monitor_drift_network:
+    driver: bridge
