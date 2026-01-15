@@ -246,25 +246,63 @@ def get_policy_for_metric(
     if metric_name in policies_dict:
         return policies_dict[metric_name]
     
-    # Try partial matches
-    metric_lower = metric_name.lower()
-    for resource_name, policy in policies_dict.items():
-        resource_lower = resource_name.lower()
-        # Match if metric name contains resource name or vice versa
-        if (resource_lower in metric_lower or metric_lower in resource_lower):
-            # Also check threshold type matches
-            if "cost" in metric_lower and policy.threshold_type == "cost":
-                return policy
-            elif "usage" in metric_lower or "cpu" in metric_lower or "memory" in metric_lower:
-                if policy.threshold_type == "usage":
-                    return policy
+    # Normalize strings for matching
+    metric_lower = metric_name.lower().strip()
     
-    # Try common patterns
+    # Try partial matches - more flexible matching
+    for resource_name, policy in policies_dict.items():
+        resource_lower = resource_name.lower().strip()
+        
+        # Check threshold type compatibility first
+        is_cost_metric = "cost" in metric_lower
+        is_usage_metric = "usage" in metric_lower or "cpu" in metric_lower or "memory" in metric_lower or "network" in metric_lower
+        
+        # Skip if threshold types don't match
+        if is_cost_metric and policy.threshold_type != "cost":
+            continue
+        if is_usage_metric and policy.threshold_type != "usage":
+            continue
+        
+        # Try various matching strategies
+        # 1. Exact match (case insensitive)
+        if metric_lower == resource_lower:
+            return policy
+        
+        # 2. Metric name contains policy name or vice versa
+        if resource_lower in metric_lower or metric_lower in resource_lower:
+            return policy
+        
+        # 3. Both contain common keywords
+        cpu_keywords = ["cpu", "processor"]
+        memory_keywords = ["memory", "mem", "ram"]
+        cost_keywords = ["cost", "price", "billing"]
+        
+        metric_has_cpu = any(kw in metric_lower for kw in cpu_keywords)
+        metric_has_memory = any(kw in metric_lower for kw in memory_keywords)
+        metric_has_cost = any(kw in metric_lower for kw in cost_keywords)
+        
+        policy_has_cpu = any(kw in resource_lower for kw in cpu_keywords)
+        policy_has_memory = any(kw in resource_lower for kw in memory_keywords)
+        policy_has_cost = any(kw in resource_lower for kw in cost_keywords)
+        
+        # Match if both have same keyword
+        if metric_has_cpu and policy_has_cpu and policy.threshold_type == "usage":
+            return policy
+        if metric_has_memory and policy_has_memory and policy.threshold_type == "usage":
+            return policy
+        if metric_has_cost and policy_has_cost and policy.threshold_type == "cost":
+            return policy
+    
+    # Try common patterns as last resort
     if "cpu" in metric_lower:
         for name, policy in policies_dict.items():
-            if "cpu" in name.lower() and policy.threshold_type == "usage":
+            if ("cpu" in name.lower() or "processor" in name.lower()) and policy.threshold_type == "usage":
                 return policy
-    elif "cost" in metric_lower:
+    if "memory" in metric_lower or "mem" in metric_lower:
+        for name, policy in policies_dict.items():
+            if ("memory" in name.lower() or "mem" in name.lower() or "ram" in name.lower()) and policy.threshold_type == "usage":
+                return policy
+    if "cost" in metric_lower:
         for name, policy in policies_dict.items():
             if "cost" in name.lower() and policy.threshold_type == "cost":
                 return policy
@@ -465,9 +503,28 @@ def check_thresholds_with_policies(
     cost_policies = load_policies_from_db(resource_type=resource_type, threshold_type="cost")
     all_policies = {**usage_policies, **cost_policies}
     
+    # Debug: Log policy loading
+    try:
+        from utils.logger import get_logger
+        logger = get_logger(__name__)
+        logger.debug(f"Loaded {len(all_policies)} policies for resource_type={resource_type}")
+        for name, policy in all_policies.items():
+            logger.debug(f"Policy: {name} - threshold={policy.threshold_value}, enabled={policy.enabled}, duration={policy.duration}")
+    except ImportError:
+        pass
+    
     # If no policies found, return empty (no alerts)
     if not all_policies:
+        print(f"[DEBUG] No policies found for resource_type={resource_type}")
+        try:
+            from utils.logger import get_logger
+            logger = get_logger(__name__)
+            logger.warning(f"No policies found for resource_type={resource_type}, threshold_type=usage or cost")
+        except ImportError:
+            pass
         return triggered_alerts
+    
+    print(f"[DEBUG] Loaded {len(all_policies)} policies: {list(all_policies.keys())}")
     
     current_timestamp = time.time()
     current_datetime = datetime.utcnow()
@@ -476,49 +533,162 @@ def check_thresholds_with_policies(
     for metric_name, metric_value in metrics.items():
         policy = get_policy_for_metric(metric_name, resource_type, all_policies)
         
-        if policy is None or not policy.enabled:
+        # Debug: Log policy matching
+        if policy is None:
+            print(f"[DEBUG] No policy found for metric: {metric_name}, resource_type: {resource_type}")
+            try:
+                from utils.logger import get_logger
+                logger = get_logger(__name__)
+                logger.debug(f"No policy found for metric: {metric_name}, resource_type: {resource_type}")
+            except ImportError:
+                pass
             continue
+        elif not policy.enabled:
+            print(f"[DEBUG] Policy found for {metric_name} but it's disabled")
+            try:
+                from utils.logger import get_logger
+                logger = get_logger(__name__)
+                logger.debug(f"Policy found for {metric_name} but it's disabled")
+            except ImportError:
+                pass
+            continue
+        else:
+            print(f"[DEBUG] Evaluating {metric_name} (value={metric_value}) against policy {policy.resource_name} (threshold={policy.threshold_value}, duration={policy.duration})")
+            try:
+                from utils.logger import get_logger
+                logger = get_logger(__name__)
+                logger.debug(f"Evaluating {metric_name} (value={metric_value}) against policy {policy.resource_name} (threshold={policy.threshold_value})")
+            except ImportError:
+                pass
         
         # Check if metric exceeds threshold
         if metric_value > policy.threshold_value:
             metric_key = (metric_name, resource_type)
             
-            if metric_key not in _threshold_exceedance_times:
-                # Start tracking exceedance
-                _threshold_exceedance_times[metric_key] = current_timestamp
-            else:
-                # Check if duration requirement is met
-                exceedance_start = _threshold_exceedance_times[metric_key]
-                exceedance_duration = (current_timestamp - exceedance_start) / 60.0  # Convert to minutes
-                
-                if exceedance_duration >= policy.duration:
-                    # Duration requirement met, trigger alert
+            # If duration is 0 or very small (<= 0.1 minutes = 6 seconds), trigger immediately
+            if policy.duration <= 0.1:
+                # Immediate trigger for testing or real-time alerts
+                try:
+                    from anomaly_detection.alert_trigger import trigger_alert
                     try:
-                        from anomaly_detection.alert_trigger import trigger_alert
-                        success = trigger_alert(metric_name, metric_value, current_datetime, resource_type)
-                        if success:
-                            triggered_alerts.append({
-                                "metric_name": metric_name,
-                                "value": metric_value,
-                                "timestamp": current_datetime,
-                                "resource_type": resource_type,
-                                "threshold": policy.threshold_value,
-                                "duration_exceeded": exceedance_duration,
-                                "policy_id": policy.policy_id
-                            })
-                            # Reset tracking after alert is triggered
-                            del _threshold_exceedance_times[metric_key]
-                    except Exception as e:
+                        from utils.logger import get_logger
+                        logger = get_logger(__name__)
+                        logger.info(f"Triggering immediate alert: {metric_name}={metric_value} exceeds threshold={policy.threshold_value}")
+                    except ImportError:
+                        print(f"Triggering immediate alert: {metric_name}={metric_value} exceeds threshold={policy.threshold_value}")
+                    
+                    success = trigger_alert(metric_name, metric_value, current_datetime, resource_type)
+                    if success:
+                        triggered_alerts.append({
+                            "metric_name": metric_name,
+                            "value": metric_value,
+                            "timestamp": current_datetime,
+                            "resource_type": resource_type,
+                            "threshold": policy.threshold_value,
+                            "duration_exceeded": 0.0,
+                            "policy_id": policy.policy_id
+                        })
                         try:
                             from utils.logger import get_logger
                             logger = get_logger(__name__)
-                            logger.error(f"Error triggering alert for {metric_name}: {e}", exc_info=True)
+                            logger.info(f"Alert triggered successfully for {metric_name}")
                         except ImportError:
-                            pass
+                            print(f"Alert triggered successfully for {metric_name}")
+                    else:
+                        try:
+                            from utils.logger import get_logger
+                            logger = get_logger(__name__)
+                            logger.error(f"Failed to trigger alert for {metric_name} - trigger_alert returned False")
+                        except ImportError:
+                            print(f"ERROR: Failed to trigger alert for {metric_name}")
+                except Exception as e:
+                    try:
+                        from utils.logger import get_logger
+                        logger = get_logger(__name__)
+                        logger.error(f"Error triggering immediate alert for {metric_name}: {e}", exc_info=True)
+                    except ImportError:
+                        print(f"ERROR triggering alert for {metric_name}: {e}")
+                        import traceback
+                        traceback.print_exc()
+            else:
+                # Duration-based tracking
+                if metric_key not in _threshold_exceedance_times:
+                    # Start tracking exceedance
+                    _threshold_exceedance_times[metric_key] = current_timestamp
+                    print(f"[DEBUG] Started tracking {metric_name} exceedance (value={metric_value:.1f} > threshold={policy.threshold_value}). Waiting {policy.duration} minutes before alert.")
+                    try:
+                        from utils.logger import get_logger
+                        logger = get_logger(__name__)
+                        logger.info(f"Started tracking {metric_name} exceedance. Will alert after {policy.duration} minutes if threshold remains exceeded.")
+                    except ImportError:
+                        pass
+                else:
+                    # Check if duration requirement is met
+                    exceedance_start = _threshold_exceedance_times[metric_key]
+                    exceedance_duration = (current_timestamp - exceedance_start) / 60.0  # Convert to minutes
+                    
+                    print(f"[DEBUG] {metric_name} still exceeding threshold. Duration so far: {exceedance_duration:.2f}/{policy.duration} minutes")
+                    try:
+                        from utils.logger import get_logger
+                        logger = get_logger(__name__)
+                        logger.debug(f"{metric_name} exceedance duration: {exceedance_duration:.2f}/{policy.duration} minutes")
+                    except ImportError:
+                        pass
+                    
+                    if exceedance_duration >= policy.duration:
+                        # Duration requirement met, trigger alert
+                        print(f"[DEBUG] Duration requirement met ({exceedance_duration:.2f} >= {policy.duration} minutes). Triggering alert for {metric_name}.")
+                        try:
+                            from anomaly_detection.alert_trigger import trigger_alert
+                            try:
+                                from utils.logger import get_logger
+                                logger = get_logger(__name__)
+                                logger.info(f"Triggering alert: {metric_name}={metric_value:.1f} exceeded threshold={policy.threshold_value} for {exceedance_duration:.2f} minutes")
+                            except ImportError:
+                                print(f"Triggering alert: {metric_name}={metric_value:.1f} exceeded threshold={policy.threshold_value} for {exceedance_duration:.2f} minutes")
+                            
+                            success = trigger_alert(metric_name, metric_value, current_datetime, resource_type)
+                            if success:
+                                triggered_alerts.append({
+                                    "metric_name": metric_name,
+                                    "value": metric_value,
+                                    "timestamp": current_datetime,
+                                    "resource_type": resource_type,
+                                    "threshold": policy.threshold_value,
+                                    "duration_exceeded": exceedance_duration,
+                                    "policy_id": policy.policy_id
+                                })
+                                print(f"[DEBUG] Alert triggered successfully for {metric_name} after {exceedance_duration:.2f} minutes")
+                                # Reset tracking after alert is triggered
+                                del _threshold_exceedance_times[metric_key]
+                                try:
+                                    from utils.logger import get_logger
+                                    logger = get_logger(__name__)
+                                    logger.info(f"Alert triggered successfully for {metric_name}. Tracking reset.")
+                                except ImportError:
+                                    pass
+                            else:
+                                print(f"[ERROR] Failed to trigger alert for {metric_name} - trigger_alert returned False")
+                                try:
+                                    from utils.logger import get_logger
+                                    logger = get_logger(__name__)
+                                    logger.error(f"Failed to trigger alert for {metric_name} - trigger_alert returned False")
+                                except ImportError:
+                                    pass
+                        except Exception as e:
+                            try:
+                                from utils.logger import get_logger
+                                logger = get_logger(__name__)
+                                logger.error(f"Error triggering duration-based alert for {metric_name}: {e}", exc_info=True)
+                            except ImportError:
+                                print(f"ERROR triggering alert for {metric_name}: {e}")
+                                import traceback
+                                traceback.print_exc()
         else:
             # Metric is below threshold, reset tracking
             metric_key = (metric_name, resource_type)
             if metric_key in _threshold_exceedance_times:
+                print(f"[DEBUG] {metric_name} is now below threshold ({metric_value:.1f} <= {policy.threshold_value}). Resetting duration tracking.")
                 del _threshold_exceedance_times[metric_key]
     
     return triggered_alerts

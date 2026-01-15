@@ -392,6 +392,7 @@ def create_resource_policy(
     threshold_value: float,
     threshold_type: str,
     duration: int,
+    enabled: bool = True,
     store_in_db: bool = True
 ) -> ResourcePolicy:
     """
@@ -405,6 +406,7 @@ def create_resource_policy(
         threshold_value: Threshold value (e.g., 80.0 for CPU usage, 500.0 for cost)
         threshold_type: Type of threshold ("usage" or "cost")
         duration: Duration in minutes for sustained exceedance before violation
+        enabled: Whether the policy is enabled (default: True)
         store_in_db: If True, automatically store policy in database
     
     Returns:
@@ -418,7 +420,8 @@ def create_resource_policy(
         resource_name=resource_name,
         threshold_value=threshold_value,
         threshold_type=threshold_type,
-        duration=duration
+        duration=duration,
+        enabled=enabled
     )
     
     # Store in database if requested

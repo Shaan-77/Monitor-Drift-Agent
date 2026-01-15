@@ -59,14 +59,14 @@ class PolicyCreateRequest(BaseModel):
     resource_name: str = Field(..., description="Resource name (e.g., 'Server CPU', 'AWS EC2')")
     threshold_value: float = Field(..., gt=0, description="Threshold value")
     threshold_type: str = Field(..., description="Threshold type (usage or cost)")
-    duration: int = Field(..., ge=1, description="Duration in minutes")
+    duration: int = Field(..., ge=0, description="Duration in minutes (0 = immediate trigger)")
     enabled: bool = Field(default=True, description="Whether the policy is enabled")
 
 
 class PolicyUpdateRequest(BaseModel):
     """Request model for updating a resource policy."""
     threshold_value: Optional[float] = Field(None, gt=0, description="Updated threshold value")
-    duration: Optional[int] = Field(None, ge=1, description="Updated duration in minutes")
+    duration: Optional[int] = Field(None, ge=0, description="Updated duration in minutes (0 = immediate trigger)")
     enabled: Optional[bool] = Field(None, description="Updated enabled status")
 
 
@@ -229,13 +229,14 @@ async def create_policy(
                 detail=f"threshold_type must be one of: {', '.join(valid_types)}"
             )
         
-        # Create policy
+        # Create policy with enabled status
         policy = create_resource_policy(
             resource_name=request.resource_name,
             threshold_value=request.threshold_value,
             threshold_type=request.threshold_type.lower(),
             duration=request.duration,
-            enabled=request.enabled
+            enabled=request.enabled,
+            store_in_db=False  # We'll store manually to get the ID
         )
         
         # Store in database

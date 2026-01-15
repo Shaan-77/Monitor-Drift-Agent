@@ -250,24 +250,48 @@ async def list_alerts(
                 )
         
         # Fetch alerts from database
-        result = get_alerts_from_db(
-            alert_id=alert_id,
-            start_time=start_datetime,
-            end_time=end_datetime,
-            severity=severity.lower() if severity else None,
-            resource_type=resource_type,
-            limit=limit,
-            offset=offset
-        )
-        
-        # Check if result contains an error
-        if 'error' in result:
+        try:
+            result = get_alerts_from_db(
+                alert_id=alert_id,
+                start_time=start_datetime,
+                end_time=end_datetime,
+                severity=severity.lower() if severity else None,
+                resource_type=resource_type,
+                limit=limit,
+                offset=offset
+            )
+            
+            # Check if result contains an error
+            if 'error' in result:
+                error_msg = result.get('error', 'Unknown error')
+                # Log the error for debugging
+                try:
+                    from utils.logger import get_logger
+                    logger = get_logger(__name__)
+                    logger.error(f"Error retrieving alerts: {error_msg}")
+                except ImportError:
+                    print(f"Error retrieving alerts: {error_msg}")
+                
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Database query failed: {error_msg}"
+                )
+            
+            return result
+        except HTTPException:
+            raise
+        except Exception as e:
+            # Log unexpected errors
+            try:
+                from utils.logger import get_logger
+                logger = get_logger(__name__)
+                logger.error(f"Unexpected error in list_alerts: {e}", exc_info=True)
+            except ImportError:
+                print(f"Unexpected error in list_alerts: {e}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Database query failed: {result.get('error', 'Unknown error')}"
+                detail=f"Unexpected error retrieving alerts: {str(e)}"
             )
-        
-        return result
     
     except HTTPException:
         raise

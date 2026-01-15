@@ -214,22 +214,123 @@ async def collect_and_store_metrics_endpoint(request: Request):
         # Store metrics in database
         storage_success = store_metrics(cpu_data, memory_data, network_data)
         
-        if storage_success:
-            return {
-                "status": "success",
-                "message": "Metrics collected and stored successfully",
-                "metrics": {
-                    "cpu_usage": cpu_data,
-                    "memory_usage": memory_data,
-                    "network_traffic": network_data
-                },
-                "timestamp": current_timestamp
-            }
-        else:
+        if not storage_success:
             raise HTTPException(
                 status_code=500,
                 detail="Failed to store metrics in database"
             )
+        
+        # Evaluate policies and trigger alerts dynamically
+        alerts_triggered = []
+        try:
+            from anomaly_detection.threshold_detection import check_thresholds_with_policies
+            
+            # Extract metric values for policy evaluation
+            cpu_usage = cpu_data.get('cpu_percent', 0.0)
+            if not isinstance(cpu_usage, (int, float)):
+                cpu_usage = 0.0
+            
+            memory_data_dict = memory_data
+            memory_usage = 0.0
+            if isinstance(memory_data_dict, dict):
+                memory_usage = memory_data_dict.get('percent', 0.0)
+                if memory_usage is None:
+                    # Try to get used bytes and convert to percentage (approximate)
+                    used = memory_data_dict.get('used', 0)
+                    total = memory_data_dict.get('total', 1)
+                    if total > 0:
+                        memory_usage = (used / total) * 100.0
+            elif isinstance(memory_data_dict, (int, float)):
+                memory_usage = float(memory_data_dict)
+            
+            # Extract network metrics for policy evaluation
+            # Network metrics are cumulative totals (bytes sent + received since system boot)
+            network_usage = None
+            if network_data and isinstance(network_data, dict):
+                bytes_sent = network_data.get('bytes_sent', 0)
+                bytes_recv = network_data.get('bytes_recv', 0)
+                if isinstance(bytes_sent, (int, float)) and isinstance(bytes_recv, (int, float)):
+                    # Calculate total network traffic (sent + received) in bytes
+                    # Note: Policy threshold should be set in bytes (e.g., 10737418240 for 10GB)
+                    network_usage = float(bytes_sent) + float(bytes_recv)
+            
+            # Build metrics dictionary for policy evaluation
+            # Always include metrics if they have valid values (even if 0)
+            metrics_dict = {}
+            if cpu_usage is not None and isinstance(cpu_usage, (int, float)):
+                metrics_dict["CPU Usage"] = float(cpu_usage)
+            if memory_usage is not None and isinstance(memory_usage, (int, float)) and memory_usage >= 0:
+                metrics_dict["Memory Usage"] = float(memory_usage)
+            if network_usage is not None and isinstance(network_usage, (int, float)) and network_usage >= 0:
+                metrics_dict["Network Usage"] = float(network_usage)
+            
+            # Debug: Log what we're evaluating
+            print(f"[DEBUG] Evaluating policies for metrics: {metrics_dict}")
+            
+            # Check thresholds using policies from database
+            if metrics_dict:
+                policy_alerts = check_thresholds_with_policies(
+                    metrics=metrics_dict,
+                    resource_type="Server"
+                )
+                if policy_alerts:
+                    alerts_triggered = policy_alerts
+                    print(f"[DEBUG] Policy evaluation triggered {len(policy_alerts)} alert(s)")
+                    # Log for debugging
+                    try:
+                        from utils.logger import get_logger
+                        logger = get_logger(__name__)
+                        logger.info(f"Policy evaluation triggered {len(policy_alerts)} alert(s)")
+                    except ImportError:
+                        pass
+                else:
+                    print(f"[DEBUG] Policy evaluation completed: no alerts triggered yet (may be tracking duration)")
+                    # Log if no alerts triggered (for debugging)
+                    try:
+                        from utils.logger import get_logger
+                        logger = get_logger(__name__)
+                        logger.debug(f"Policy evaluation completed: no alerts triggered yet for metrics {list(metrics_dict.keys())} (may be tracking duration)")
+                    except ImportError:
+                        pass
+            else:
+                print(f"[DEBUG] No valid metrics to evaluate (cpu={cpu_usage}, memory={memory_usage})")
+        except ImportError as e:
+            # Policy checking not available - log but don't fail
+            try:
+                from utils.logger import get_logger
+                logger = get_logger(__name__)
+                logger.warning(f"Policy-based alert checking not available: {e}")
+            except ImportError:
+                pass
+        except Exception as e:
+            # Log error but don't fail the metric collection
+            try:
+                from utils.logger import get_logger
+                logger = get_logger(__name__)
+                logger.error(f"Error during policy evaluation: {e}", exc_info=True)
+            except ImportError:
+                print(f"ERROR during policy evaluation: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Build response
+        response = {
+            "status": "success",
+            "message": "Metrics collected and stored successfully",
+            "metrics": {
+                "cpu_usage": cpu_data,
+                "memory_usage": memory_data,
+                "network_traffic": network_data
+            },
+            "timestamp": current_timestamp
+        }
+        
+        # Add alerts information if any were triggered
+        if alerts_triggered:
+            response["alerts_triggered"] = len(alerts_triggered)
+            response["alerts"] = alerts_triggered
+        
+        return response
     
     except RuntimeError as e:
         raise HTTPException(

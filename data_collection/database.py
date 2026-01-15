@@ -2021,12 +2021,13 @@ def store_alert_in_db(
         # Establish database connection
         conn = connect_to_db()
         if conn is None:
-            print("Failed to establish database connection")
+            print("Error: Failed to establish database connection for storing alert")
             return False
         
         # Ensure schema exists
         if not create_alerts_schema(conn):
-            print("Failed to create/verify alerts schema")
+            print("Error: Failed to create/verify alerts schema")
+            conn.close()
             return False
         
         # Ensure self_healing_log schema exists
@@ -2035,6 +2036,21 @@ def store_alert_in_db(
             # Don't fail alert storage if self_healing_log schema missing
         
         cursor = conn.cursor()
+        
+        # Debug: Verify table exists
+        try:
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.tables 
+                WHERE table_schema = 'public' AND table_name = 'alerts'
+            """)
+            table_exists = cursor.fetchone()[0] > 0
+            if not table_exists:
+                print("ERROR: alerts table does not exist in database")
+                cursor.close()
+                conn.close()
+                return False
+        except Exception as e:
+            print(f"Warning: Could not verify alerts table existence: {e}")
         
         # Ensure timestamp is UTC and timezone-naive
         if isinstance(timestamp, datetime):
@@ -2078,10 +2094,11 @@ def store_alert_in_db(
         if not action_taken or not isinstance(action_taken, str):
             action_taken = "Alert Triggered"
         
-        # Insert query
+        # Insert query with RETURNING to get the ID
         insert_query = """
             INSERT INTO alerts (metric_name, value, timestamp, resource_type, severity, action_taken)
-            VALUES (%s, %s, %s, %s, %s, %s);
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id;
         """
         
         cursor.execute(
@@ -2089,8 +2106,23 @@ def store_alert_in_db(
             (metric_name, float(value), alert_timestamp, resource_type, severity, action_taken)
         )
         
+        # Get the inserted alert ID
+        result = cursor.fetchone()
+        alert_id = result[0] if result else None
+        
         conn.commit()
         cursor.close()
+        
+        # Debug: Log successful storage
+        if alert_id:
+            try:
+                from utils.logger import get_logger
+                logger = get_logger(__name__)
+                logger.info(f"Alert stored successfully: ID={alert_id}, metric={metric_name}, value={value}, severity={severity}")
+            except ImportError:
+                print(f"✓ Alert stored successfully: ID={alert_id}, metric={metric_name}, value={value}, severity={severity}")
+        else:
+            print(f"WARNING: Alert insert succeeded but no ID returned")
         
         return True
     
@@ -2231,6 +2263,8 @@ def get_alerts_from_db(
         }
     
     except Error as e:
+        error_msg = f"Database error: {str(e)}"
+        print(f"Error in get_alerts_from_db: {error_msg}")
         if cursor:
             cursor.close()
         if conn:
@@ -2240,9 +2274,13 @@ def get_alerts_from_db(
             "total": 0,
             "limit": limit,
             "offset": offset,
-            "error": f"Database error: {str(e)}"
+            "error": error_msg
         }
     except Exception as e:
+        error_msg = f"Unexpected error: {str(e)}"
+        print(f"Unexpected error in get_alerts_from_db: {error_msg}")
+        import traceback
+        traceback.print_exc()
         if cursor:
             cursor.close()
         if conn:
@@ -2252,7 +2290,7 @@ def get_alerts_from_db(
             "total": 0,
             "limit": limit,
             "offset": offset,
-            "error": f"Unexpected error: {str(e)}"
+            "error": error_msg
         }
 
 
