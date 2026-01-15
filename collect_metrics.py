@@ -5,6 +5,16 @@ This script uses APScheduler to continuously collect system metrics
 at regular intervals and store them in the PostgreSQL database.
 """
 
+# Initialize error capture early to catch all terminal errors
+try:
+    from utils.error_capture import initialize_error_capture
+    import os
+    _error_log_file = os.getenv("ERROR_LOG_FILE", "errors.log")
+    initialize_error_capture(_error_log_file)
+except Exception:
+    # If error capture fails, continue without it
+    pass
+
 import signal
 import sys
 import time
@@ -128,9 +138,50 @@ def monitor_cost_spikes_and_trigger_alerts():
             resources_monitored += 1
             
             try:
-                # 1. Check against absolute threshold (e.g., $500/day)
+                # 1. Check against policies from database (dynamic)
+                from anomaly_detection.threshold_detection import check_thresholds_with_policies
+                
+                # Determine resource type from resource name
+                cloud_resource_type = "Cloud"
+                if "AWS" in resource_name or "aws" in resource_name.lower():
+                    cloud_resource_type = "AWS"
+                elif "GCP" in resource_name or "gcp" in resource_name.lower() or "Google" in resource_name:
+                    cloud_resource_type = "GCP"
+                elif "Azure" in resource_name or "azure" in resource_name.lower():
+                    cloud_resource_type = "Azure"
+                
+                # Use dynamic policy-based checking
+                cost_metrics = {"Cloud Cost": current_cost}
+                policy_alerts = check_thresholds_with_policies(
+                    metrics=cost_metrics,
+                    resource_type=cloud_resource_type
+                )
+                
+                if policy_alerts:
+                    alerts_triggered += len(policy_alerts)
+                    for alert in policy_alerts:
+                        logger.warning(
+                            f"Policy-based threshold alert triggered for {resource_name}: "
+                            f"Cost ${current_cost:.2f} exceeds threshold ${alert['threshold']:.2f} "
+                            f"(policy ID: {alert.get('policy_id', 'N/A')})"
+                        )
+                else:
+                    # Fallback to old method if no policies found
+                    threshold_alerts = check_thresholds(
+                        cpu_usage=0.0,  # Not checking CPU here
+                        cloud_cost=current_cost,
+                        resource_type=cloud_resource_type
+                    )
+                    if threshold_alerts:
+                        alerts_triggered += len(threshold_alerts)
+                        logger.warning(
+                            f"Threshold alert triggered for {resource_name}: "
+                            f"Cost ${current_cost:.2f} exceeds threshold"
+                        )
+            except ImportError:
+                # Fallback if new function not available
                 threshold_alerts = check_thresholds(
-                    cpu_usage=0.0,  # Not checking CPU here
+                    cpu_usage=0.0,
                     cloud_cost=current_cost,
                     resource_type="Cloud"
                 )
@@ -138,7 +189,7 @@ def monitor_cost_spikes_and_trigger_alerts():
                     alerts_triggered += len(threshold_alerts)
                     logger.warning(
                         f"Threshold alert triggered for {resource_name}: "
-                        f"Cost ${current_cost:.2f} exceeds threshold ${settings.cloud_cost_threshold:.2f}"
+                        f"Cost ${current_cost:.2f} exceeds threshold"
                     )
                 
                 # 2. Compare to historical average (detect spikes)
@@ -284,49 +335,75 @@ def monitor_system_metrics_and_trigger_alerts(server_metrics: dict = None):
         elif 'memory_percent' in server_metrics:
             memory_usage = float(server_metrics['memory_percent'])
         
-        # Monitor CPU usage
-        if cpu_usage > 0:
-            try:
-                cpu_alerts = check_thresholds(
-                    cpu_usage=cpu_usage,
-                    cloud_cost=0.0,  # Not checking cloud cost here
+        # Use dynamic policy-based threshold checking
+        try:
+            from anomaly_detection.threshold_detection import check_thresholds_with_policies
+            
+            # Build metrics dictionary
+            metrics_dict = {}
+            if cpu_usage > 0:
+                metrics_dict["CPU Usage"] = cpu_usage
+            if memory_usage > 0:
+                metrics_dict["Memory Usage"] = memory_usage
+            
+            # Check thresholds using policies from database
+            if metrics_dict:
+                policy_alerts = check_thresholds_with_policies(
+                    metrics=metrics_dict,
                     resource_type="Server"
                 )
-                if cpu_alerts:
-                    alerts_triggered += len(cpu_alerts)
-                    logger.warning(
-                        f"CPU usage alert triggered: {cpu_usage:.1f}% exceeds threshold "
-                        f"{settings.cpu_usage_threshold:.1f}%"
-                    )
-            except Exception as e:
-                logger.error(f"Error checking CPU thresholds: {e}", exc_info=True)
-        
-        # Monitor memory usage (using check_thresholds with memory as CPU equivalent)
-        # Note: check_thresholds currently only checks CPU, but we can extend it
-        # For now, we'll check memory manually
-        if memory_usage > 0:
-            try:
-                memory_threshold = getattr(settings, 'default_memory_threshold', 80.0)
-                if memory_usage > memory_threshold:
-                    # Trigger alert for memory
-                    try:
-                        from anomaly_detection.alert_trigger import trigger_alert
-                        alert_triggered = trigger_alert(
-                            "Memory Usage",
-                            memory_usage,
-                            datetime.utcnow(),
-                            "Server"
+                if policy_alerts:
+                    alerts_triggered += len(policy_alerts)
+                    for alert in policy_alerts:
+                        logger.warning(
+                            f"{alert['metric_name']} alert triggered: {alert['value']:.1f} "
+                            f"exceeds threshold {alert['threshold']:.1f} "
+                            f"(policy ID: {alert.get('policy_id', 'N/A')})"
                         )
-                        if alert_triggered:
-                            alerts_triggered += 1
-                            logger.warning(
-                                f"Memory usage alert triggered: {memory_usage:.1f}% exceeds threshold "
-                                f"{memory_threshold:.1f}%"
+        except ImportError:
+            # Fallback to old method if new function not available
+            logger.warning("Dynamic policy checking not available, using fallback method")
+            # Monitor CPU usage
+            if cpu_usage > 0:
+                try:
+                    cpu_alerts = check_thresholds(
+                        cpu_usage=cpu_usage,
+                        cloud_cost=0.0,  # Not checking cloud cost here
+                        resource_type="Server"
+                    )
+                    if cpu_alerts:
+                        alerts_triggered += len(cpu_alerts)
+                        logger.warning(
+                            f"CPU usage alert triggered: {cpu_usage:.1f}% exceeds threshold"
+                        )
+                except Exception as e:
+                    logger.error(f"Error checking CPU thresholds: {e}", exc_info=True)
+            
+            # Monitor memory usage
+            if memory_usage > 0:
+                try:
+                    memory_threshold = getattr(settings, 'default_memory_threshold', 80.0)
+                    if memory_usage > memory_threshold:
+                        try:
+                            from anomaly_detection.alert_trigger import trigger_alert
+                            alert_triggered = trigger_alert(
+                                "Memory Usage",
+                                memory_usage,
+                                datetime.utcnow(),
+                                "Server"
                             )
-                    except Exception as e:
-                        logger.error(f"Error triggering memory alert: {e}", exc_info=True)
-            except Exception as e:
-                logger.error(f"Error checking memory thresholds: {e}", exc_info=True)
+                            if alert_triggered:
+                                alerts_triggered += 1
+                                logger.warning(
+                                    f"Memory usage alert triggered: {memory_usage:.1f}% exceeds threshold "
+                                    f"{memory_threshold:.1f}%"
+                                )
+                        except Exception as e:
+                            logger.error(f"Error triggering memory alert: {e}", exc_info=True)
+                except Exception as e:
+                    logger.error(f"Error checking memory thresholds: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Error during dynamic policy-based threshold checking: {e}", exc_info=True)
         
         result = {
             'monitored': 2 if (cpu_usage > 0 or memory_usage > 0) else 0,

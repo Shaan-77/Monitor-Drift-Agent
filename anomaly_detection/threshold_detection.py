@@ -17,6 +17,15 @@ except ImportError:
     def get_settings():
         return None
 
+# Import policy management for dynamic policy loading
+try:
+    from policy_management.policy_definition import list_resource_policies_from_db, ResourcePolicy
+    POLICY_MANAGEMENT_AVAILABLE = True
+except ImportError:
+    POLICY_MANAGEMENT_AVAILABLE = False
+    list_resource_policies_from_db = None
+    ResourcePolicy = None
+
 # Module-level tracking for threshold exceedance duration
 # Key: (metric_name, resource_type), Value: start_timestamp (float - Unix timestamp)
 _threshold_exceedance_times: Dict[tuple, float] = {}
@@ -152,6 +161,117 @@ def create_threshold_detector(rules: List[Dict]) -> ThresholdDetector:
     return ThresholdDetector(threshold_rules)
 
 
+def load_policies_from_db(
+    resource_type: str = None,
+    threshold_type: str = None
+) -> Dict[str, ResourcePolicy]:
+    """
+    Load policies from database dynamically.
+    
+    This function loads enabled policies from the database and returns them
+    as a dictionary keyed by resource name for efficient lookup.
+    
+    Args:
+        resource_type: Optional filter by resource type (Server, AWS, GCP, Azure)
+        threshold_type: Optional filter by threshold type (usage, cost)
+    
+    Returns:
+        Dictionary mapping resource names to ResourcePolicy instances
+    """
+    policies_dict = {}
+    
+    if not POLICY_MANAGEMENT_AVAILABLE or list_resource_policies_from_db is None:
+        return policies_dict
+    
+    try:
+        # Load enabled policies from database
+        policies = list_resource_policies_from_db(
+            enabled_only=True,
+            threshold_type=threshold_type
+        )
+        
+        # Filter by resource_type if specified
+        if resource_type:
+            # Map resource_type to common resource name patterns
+            resource_patterns = {
+                "Server": ["Server", "CPU", "Memory", "Disk", "Network"],
+                "AWS": ["AWS", "EC2", "S3", "RDS"],
+                "GCP": ["GCP", "Compute", "Storage", "Cloud"],
+                "Azure": ["Azure", "VM", "Blob"]
+            }
+            
+            patterns = resource_patterns.get(resource_type, [resource_type])
+            policies = [
+                p for p in policies
+                if any(pattern.lower() in p.resource_name.lower() for pattern in patterns)
+            ]
+        
+        # Convert to dictionary for efficient lookup
+        for policy in policies:
+            policies_dict[policy.resource_name] = policy
+        
+    except Exception as e:
+        try:
+            from utils.logger import get_logger
+            logger = get_logger(__name__)
+            logger.warning(f"Error loading policies from database: {e}")
+        except ImportError:
+            pass
+    
+    return policies_dict
+
+
+def get_policy_for_metric(
+    metric_name: str,
+    resource_type: str,
+    policies_dict: Dict[str, ResourcePolicy] = None
+) -> Optional[ResourcePolicy]:
+    """
+    Get the appropriate policy for a metric based on metric name and resource type.
+    
+    Args:
+        metric_name: Name of the metric (e.g., "CPU Usage", "Cloud Cost")
+        resource_type: Resource type (Server, AWS, GCP, Azure)
+        policies_dict: Optional pre-loaded policies dictionary
+    
+    Returns:
+        Matching ResourcePolicy or None if not found
+    """
+    if policies_dict is None:
+        # Determine threshold type from metric name
+        threshold_type = "cost" if "cost" in metric_name.lower() else "usage"
+        policies_dict = load_policies_from_db(resource_type=resource_type, threshold_type=threshold_type)
+    
+    # Try exact match first
+    if metric_name in policies_dict:
+        return policies_dict[metric_name]
+    
+    # Try partial matches
+    metric_lower = metric_name.lower()
+    for resource_name, policy in policies_dict.items():
+        resource_lower = resource_name.lower()
+        # Match if metric name contains resource name or vice versa
+        if (resource_lower in metric_lower or metric_lower in resource_lower):
+            # Also check threshold type matches
+            if "cost" in metric_lower and policy.threshold_type == "cost":
+                return policy
+            elif "usage" in metric_lower or "cpu" in metric_lower or "memory" in metric_lower:
+                if policy.threshold_type == "usage":
+                    return policy
+    
+    # Try common patterns
+    if "cpu" in metric_lower:
+        for name, policy in policies_dict.items():
+            if "cpu" in name.lower() and policy.threshold_type == "usage":
+                return policy
+    elif "cost" in metric_lower:
+        for name, policy in policies_dict.items():
+            if "cost" in name.lower() and policy.threshold_type == "cost":
+                return policy
+    
+    return None
+
+
 def check_thresholds(
     cpu_usage: float,
     cloud_cost: float,
@@ -163,18 +283,17 @@ def check_thresholds(
     """
     Check if CPU usage or cloud cost exceeds thresholds and track duration.
     
-    This function compares current CPU usage and cloud cost against predefined
-    thresholds. It tracks if each metric exceeds its threshold for the required
-    duration (e.g., 5 minutes) before triggering an alert. The tracking uses
-    time.time() for efficient timestamp management. If a metric falls below its
-    threshold before the duration requirement is met, the tracking is reset.
+    This function dynamically loads policies from the database and uses them
+    for threshold detection. If no policies are found, it falls back to
+    settings. It tracks if each metric exceeds its threshold for the required
+    duration (e.g., 5 minutes) before triggering an alert.
     
     Args:
         cpu_usage: Current CPU usage percentage (0-100)
         cloud_cost: Current cloud cost in dollars per day
-        cpu_threshold: CPU usage threshold percentage (defaults to settings)
-        cost_threshold: Cloud cost threshold in dollars per day (defaults to settings)
-        duration: Duration in minutes for threshold to be sustained (defaults to settings)
+        cpu_threshold: CPU usage threshold percentage (overrides policy if provided)
+        cost_threshold: Cloud cost threshold in dollars per day (overrides policy if provided)
+        duration: Duration in minutes for threshold to be sustained (overrides policy if provided)
         resource_type: Resource type identifier (Server, AWS, GCP, Azure)
     
     Returns:
@@ -186,17 +305,36 @@ def check_thresholds(
     """
     triggered_alerts = []
     
-    # Get thresholds from settings if not provided
-    settings = get_settings()
-    if settings is None:
-        raise RuntimeError("Settings not available. Cannot determine thresholds.")
+    # Load policies dynamically from database
+    usage_policies = load_policies_from_db(resource_type=resource_type, threshold_type="usage")
+    cost_policies = load_policies_from_db(resource_type=resource_type, threshold_type="cost")
     
-    if cpu_threshold is None:
-        cpu_threshold = settings.cpu_usage_threshold
-    if cost_threshold is None:
-        cost_threshold = settings.cloud_cost_threshold
-    if duration is None:
-        duration = settings.cpu_threshold_duration
+    # Get CPU policy
+    cpu_policy = get_policy_for_metric("CPU Usage", resource_type, usage_policies)
+    if cpu_policy and cpu_threshold is None:
+        cpu_threshold = cpu_policy.threshold_value
+        if duration is None:
+            duration = cpu_policy.duration
+    
+    # Get cost policy
+    cost_policy = get_policy_for_metric("Cloud Cost", resource_type, cost_policies)
+    if cost_policy and cost_threshold is None:
+        cost_threshold = cost_policy.threshold_value
+        if duration is None:
+            duration = cost_policy.duration
+    
+    # Fallback to settings if no policies found
+    if cpu_threshold is None or cost_threshold is None or duration is None:
+        settings = get_settings()
+        if settings is None:
+            raise RuntimeError("Settings not available and no policies found. Cannot determine thresholds.")
+        
+        if cpu_threshold is None:
+            cpu_threshold = settings.cpu_usage_threshold
+        if cost_threshold is None:
+            cost_threshold = settings.cloud_cost_threshold
+        if duration is None:
+            duration = settings.cpu_threshold_duration
     
     # Validate inputs
     if not isinstance(cpu_usage, (int, float)) or cpu_usage < 0 or cpu_usage > 100:
@@ -303,6 +441,89 @@ def check_thresholds(
     return triggered_alerts
 
 
+def check_thresholds_with_policies(
+    metrics: Dict[str, float],
+    resource_type: str = "Server"
+) -> List[Dict]:
+    """
+    Check thresholds dynamically using policies from database.
+    
+    This function loads policies from the database and evaluates all provided
+    metrics against their corresponding policies.
+    
+    Args:
+        metrics: Dictionary mapping metric names to values
+        resource_type: Resource type identifier (Server, AWS, GCP, Azure)
+    
+    Returns:
+        List of triggered alerts (empty if no thresholds exceeded)
+    """
+    triggered_alerts = []
+    
+    # Load all relevant policies
+    usage_policies = load_policies_from_db(resource_type=resource_type, threshold_type="usage")
+    cost_policies = load_policies_from_db(resource_type=resource_type, threshold_type="cost")
+    all_policies = {**usage_policies, **cost_policies}
+    
+    # If no policies found, return empty (no alerts)
+    if not all_policies:
+        return triggered_alerts
+    
+    current_timestamp = time.time()
+    current_datetime = datetime.utcnow()
+    
+    # Evaluate each metric against its policy
+    for metric_name, metric_value in metrics.items():
+        policy = get_policy_for_metric(metric_name, resource_type, all_policies)
+        
+        if policy is None or not policy.enabled:
+            continue
+        
+        # Check if metric exceeds threshold
+        if metric_value > policy.threshold_value:
+            metric_key = (metric_name, resource_type)
+            
+            if metric_key not in _threshold_exceedance_times:
+                # Start tracking exceedance
+                _threshold_exceedance_times[metric_key] = current_timestamp
+            else:
+                # Check if duration requirement is met
+                exceedance_start = _threshold_exceedance_times[metric_key]
+                exceedance_duration = (current_timestamp - exceedance_start) / 60.0  # Convert to minutes
+                
+                if exceedance_duration >= policy.duration:
+                    # Duration requirement met, trigger alert
+                    try:
+                        from anomaly_detection.alert_trigger import trigger_alert
+                        success = trigger_alert(metric_name, metric_value, current_datetime, resource_type)
+                        if success:
+                            triggered_alerts.append({
+                                "metric_name": metric_name,
+                                "value": metric_value,
+                                "timestamp": current_datetime,
+                                "resource_type": resource_type,
+                                "threshold": policy.threshold_value,
+                                "duration_exceeded": exceedance_duration,
+                                "policy_id": policy.policy_id
+                            })
+                            # Reset tracking after alert is triggered
+                            del _threshold_exceedance_times[metric_key]
+                    except Exception as e:
+                        try:
+                            from utils.logger import get_logger
+                            logger = get_logger(__name__)
+                            logger.error(f"Error triggering alert for {metric_name}: {e}", exc_info=True)
+                        except ImportError:
+                            pass
+        else:
+            # Metric is below threshold, reset tracking
+            metric_key = (metric_name, resource_type)
+            if metric_key in _threshold_exceedance_times:
+                del _threshold_exceedance_times[metric_key]
+    
+    return triggered_alerts
+
+
 def compare_cost_to_historical(
     current_cost: float,
     resource_name: str,
@@ -339,15 +560,28 @@ def compare_cost_to_historical(
         RuntimeError: If settings not available
         ValueError: If input values are invalid
     """
-    # Get thresholds from settings if not provided
+    # Try to get thresholds from policies first
+    cost_policies = load_policies_from_db(threshold_type="cost")
+    cost_policy = get_policy_for_metric("Cloud Cost", resource_name, cost_policies)
+    
+    # Get thresholds from settings if not provided and no policy found
     settings = get_settings()
     if settings is None:
         raise RuntimeError("Settings not available. Cannot determine thresholds.")
     
     if spike_threshold_percent is None:
-        spike_threshold_percent = settings.cost_spike_threshold_percent
+        # Use policy threshold if available, otherwise use settings
+        if cost_policy:
+            # Convert threshold value to percentage (assuming 20% default)
+            spike_threshold_percent = 20.0  # Default spike threshold
+        else:
+            spike_threshold_percent = settings.cost_spike_threshold_percent
     if lookback_days is None:
-        lookback_days = settings.historical_cost_lookback_days
+        if cost_policy:
+            # Use policy duration as lookback days (convert minutes to days, min 1 day)
+            lookback_days = max(1, cost_policy.duration // (24 * 60))
+        else:
+            lookback_days = settings.historical_cost_lookback_days
     
     # Validate inputs
     if not isinstance(current_cost, (int, float)) or current_cost < 0:
@@ -517,15 +751,26 @@ def monitor_sustained_spikes(
         RuntimeError: If settings not available
         ValueError: If input values are invalid
     """
-    # Get thresholds from settings if not provided
+    # Try to get thresholds from policies first
+    cost_policies = load_policies_from_db(threshold_type="cost")
+    cost_policy = get_policy_for_metric("Cloud Cost", resource_name, cost_policies)
+    
+    # Get thresholds from settings if not provided and no policy found
     settings = get_settings()
     if settings is None:
         raise RuntimeError("Settings not available. Cannot determine thresholds.")
     
     if threshold is None:
-        threshold = settings.cloud_cost_threshold
+        if cost_policy:
+            threshold = cost_policy.threshold_value
+        else:
+            threshold = settings.cloud_cost_threshold
     if consecutive_days is None:
-        consecutive_days = settings.sustained_cost_spike_days
+        if cost_policy:
+            # Use policy duration converted to days (min 1 day)
+            consecutive_days = max(1, cost_policy.duration // (24 * 60))
+        else:
+            consecutive_days = settings.sustained_cost_spike_days
     
     # Validate inputs
     if not isinstance(current_cost, (int, float)) or current_cost < 0:

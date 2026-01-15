@@ -47,10 +47,15 @@ except ImportError:
 
 # Import database functions
 try:
-    from data_collection.database import get_metrics_from_db
+    from data_collection.database import get_metrics_from_db, store_metrics
+    from data_collection.system_metrics import collect_and_store_metrics
 except ImportError:
     def get_metrics_from_db(*args, **kwargs):
         raise RuntimeError("Database module not available")
+    def store_metrics(*args, **kwargs):
+        raise RuntimeError("Database module not available")
+    def collect_and_store_metrics():
+        raise RuntimeError("System metrics module not available")
 
 # Create router
 router = APIRouter()
@@ -174,6 +179,67 @@ async def get_metrics(request: Request):
         raise HTTPException(
             status_code=500,
             detail=f"Unexpected error collecting metrics: {str(e)}"
+        )
+
+
+@router.post("/api/metrics/collect")
+@apply_rate_limit
+async def collect_and_store_metrics_endpoint(request: Request):
+    """
+    Collect system metrics and store them in the database.
+    
+    This endpoint collects current CPU, memory, and network metrics
+    and stores them in the PostgreSQL database for historical tracking.
+    
+    Returns:
+        JSON response containing:
+            - status: "success" or "error"
+            - message: Status message
+            - metrics: Collected metrics data
+            - timestamp: ISO format timestamp
+    
+    Raises:
+        HTTPException: 500 if metric collection or storage fails
+        RateLimitExceeded: 429 if rate limit is exceeded
+    """
+    try:
+        # Collect all metrics
+        cpu_data = get_cpu_usage()
+        memory_data = get_memory_usage()
+        network_data = get_network_traffic()
+        
+        # Get unified timestamp
+        current_timestamp = datetime.now().isoformat()
+        
+        # Store metrics in database
+        storage_success = store_metrics(cpu_data, memory_data, network_data)
+        
+        if storage_success:
+            return {
+                "status": "success",
+                "message": "Metrics collected and stored successfully",
+                "metrics": {
+                    "cpu_usage": cpu_data,
+                    "memory_usage": memory_data,
+                    "network_traffic": network_data
+                },
+                "timestamp": current_timestamp
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to store metrics in database"
+            )
+    
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to collect metrics: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
         )
 
 

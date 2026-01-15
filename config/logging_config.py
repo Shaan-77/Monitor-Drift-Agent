@@ -10,6 +10,17 @@ import sys
 from logging.handlers import RotatingFileHandler
 from typing import Optional
 
+# Initialize error capture early to catch all terminal errors
+try:
+    from utils.error_capture import initialize_error_capture
+    # Initialize error capture with errors.log file
+    _error_log_file = os.getenv("ERROR_LOG_FILE", "errors.log")
+    initialize_error_capture(_error_log_file)
+except Exception:
+    # If error capture fails to initialize, continue without it
+    # This ensures the application can still start
+    pass
+
 
 def setup_logging(
     log_level: Optional[str] = None,

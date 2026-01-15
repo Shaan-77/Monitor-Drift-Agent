@@ -5,9 +5,20 @@ This module creates and configures the FastAPI application,
 including all routers and middleware.
 """
 
+# Initialize error capture early to catch all terminal errors
+try:
+    from utils.error_capture import initialize_error_capture
+    import os
+    _error_log_file = os.getenv("ERROR_LOG_FILE", "errors.log")
+    initialize_error_capture(_error_log_file)
+except Exception:
+    # If error capture fails, continue without it
+    pass
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
 # Try to import slowapi for rate limiting error handling
 try:
@@ -21,6 +32,7 @@ except ImportError:
 # Import routers
 from api.metrics import router as metrics_router
 from api.policies import router as policies_router
+from api.alerts import router as alerts_router
 
 # Import settings
 try:
@@ -29,11 +41,51 @@ except ImportError:
     def get_settings():
         return None
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for FastAPI application.
+    
+    Handles startup and shutdown events:
+    - Startup: Initialize database schemas
+    - Shutdown: Cleanup (if needed)
+    """
+    # Startup: Initialize database
+    try:
+        from data_collection.database import initialize_database
+        initialized = initialize_database()
+        if initialized:
+            print("✓ Database initialized successfully - all schemas created")
+        else:
+            print("⚠ Warning: Database initialization failed or was skipped")
+            print("  The API will start, but database features may not work.")
+            print("  To fix: Set DATABASE_URL environment variable with correct credentials.")
+            print("  Example: export DATABASE_URL=postgresql://username:password@localhost:5432/monitor_drift")
+    except RuntimeError as e:
+        # psycopg2 not available or other critical error
+        print(f"✗ Error during database initialization: {e}")
+        print("  The API will start, but database features may not work.")
+        if "psycopg2" in str(e).lower():
+            print("  To fix: Install psycopg2-binary: pip install psycopg2-binary")
+    except Exception as e:
+        # Other errors (connection failures, etc.)
+        print(f"✗ Error during database initialization: {e}")
+        print("  The API will start, but database features may not work.")
+        print("  To fix: Check your DATABASE_URL environment variable and ensure PostgreSQL is running.")
+    
+    yield  # Application runs here
+    
+    # Shutdown: Cleanup if needed (none required for now)
+    # Connection cleanup is handled by individual functions
+
+
 # Create FastAPI app
 app = FastAPI(
     title="Monitor/Drift Agent API",
     description="API for collecting and managing system metrics, alerts, and policies",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Add CORS middleware
@@ -90,6 +142,7 @@ if SLOWAPI_AVAILABLE:
 # Include routers
 app.include_router(metrics_router)
 app.include_router(policies_router)
+app.include_router(alerts_router)
 
 
 @app.get("/health")
@@ -98,12 +151,30 @@ async def health_check():
     Health check endpoint for monitoring and load balancers.
     
     Returns:
-        JSON response indicating API health status
+        JSON response indicating API health status and database connectivity
     """
+    # Check database connection status
+    database_status = "unknown"
+    try:
+        from data_collection.database import connect_to_db, PSYCOPG2_AVAILABLE
+        
+        if not PSYCOPG2_AVAILABLE:
+            database_status = "unavailable (psycopg2 not installed)"
+        else:
+            conn = connect_to_db()
+            if conn:
+                conn.close()
+                database_status = "connected"
+            else:
+                database_status = "disconnected"
+    except Exception as e:
+        database_status = f"error: {str(e)}"
+    
     return {
         "status": "healthy",
         "service": "Monitor/Drift Agent API",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "database": database_status
     }
 
 
@@ -120,8 +191,12 @@ async def root():
         "version": "1.0.0",
         "endpoints": {
             "metrics": "/api/metrics",
+            "metrics_collect": "/api/metrics/collect",
+            "metrics_stored": "/api/metrics/cloud-and-server",
+            "alerts": "/api/alerts",
             "policies": "/api/policies",
-            "health": "/health"
+            "health": "/health",
+            "docs": "/docs"
         }
     }
 

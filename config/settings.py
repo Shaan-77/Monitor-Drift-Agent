@@ -8,6 +8,29 @@ thresholds, alert channels, database connections, and other settings.
 import os
 from typing import Dict, Optional, Any
 
+# Try to load environment variables from .env file
+# This allows users to create a .env file in the project root
+# with their configuration instead of setting environment variables manually
+try:
+    from dotenv import load_dotenv
+    # Load .env file from project root (parent of config directory)
+    # This is the recommended location: project_root/.env
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    env_path = os.path.join(project_root, '.env')
+    
+    # Try to load from project root first
+    if os.path.exists(env_path):
+        load_dotenv(env_path, override=True)
+    else:
+        # Fallback: try loading from current working directory
+        # This allows .env file to be in the directory where the script is run from
+        load_dotenv(override=False)
+except ImportError:
+    # python-dotenv is not installed, skip .env file loading
+    # Environment variables must be set manually or via system
+    # To enable .env support: pip install python-dotenv
+    pass
+
 
 class Settings:
     """Manages application settings."""

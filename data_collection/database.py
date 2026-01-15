@@ -301,7 +301,22 @@ def connect_to_db():
         return conn
     
     except OperationalError as e:
-        print(f"Error connecting to database: {e}")
+        error_str = str(e)
+        # Provide more helpful error messages
+        if "password authentication failed" in error_str.lower():
+            print(f"Error connecting to database: {error_str}")
+            print("  Hint: Check your DATABASE_URL credentials. Current format: postgresql://username:password@host:port/dbname")
+            # Try to show the username being used
+            if settings:
+                try:
+                    # urlparse is already imported at module level
+                    parsed = urlparse(settings.database_url)
+                    if parsed.username:
+                        print(f"  Attempting to connect as user: {parsed.username}")
+                except Exception:
+                    pass
+        else:
+            print(f"Error connecting to database: {e}")
         return None
     except (ValueError, AttributeError) as e:
         print(f"Error parsing database URL: {e}")
@@ -963,6 +978,41 @@ def store_metrics(cpu_data: Dict, memory_data: Dict, network_data: Dict) -> bool
         # Commit transaction only after all three inserts succeed
         conn.commit()
         cursor.close()
+        
+        # ALSO store in unified cloud_server_metrics table for API retrieval
+        # This ensures the GET /api/metrics/cloud-and-server endpoint can retrieve the data
+        try:
+            # Calculate network traffic from bytes
+            network_traffic_total = bytes_sent + bytes_recv
+            
+            # Get memory usage - prefer percent, fallback to used bytes
+            memory_value = memory_usage
+            if memory_value is None:
+                memory_value = memory_data.get('used', 0.0)
+            
+            # If memory is in bytes, convert to percentage (approximate)
+            # Assuming typical system has reasonable memory, we'll use the value as-is
+            # The API can handle both percentage and bytes
+            if isinstance(memory_value, (int, float)) and memory_value > 100:
+                # Likely bytes, but we'll store as-is since cloud_server_metrics accepts NUMERIC
+                memory_value = float(memory_value)
+            else:
+                memory_value = float(memory_value) if memory_value else 0.0
+            
+            # Use store_unified_metrics to store in cloud_server_metrics table
+            unified_success = store_unified_metrics(
+                cpu_usage=float(cpu_usage),
+                memory_usage=memory_value,
+                network_traffic=float(network_traffic_total),
+                resource_type='Server',
+                timestamp=metric_timestamp
+            )
+            
+            if not unified_success:
+                print("Warning: Metrics stored in system_metrics but failed to store in cloud_server_metrics")
+        except Exception as e:
+            print(f"Warning: Failed to store in unified table: {e}")
+            # Don't fail the entire operation if unified storage fails
         
         return True
     
@@ -2060,6 +2110,152 @@ def store_alert_in_db(
             conn.close()
 
 
+def get_alerts_from_db(
+    alert_id: Optional[int] = None,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+    severity: Optional[str] = None,
+    resource_type: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0
+) -> Dict[str, Any]:
+    """
+    Retrieve alerts from the database with optional filtering.
+    
+    Args:
+        alert_id: Optional specific alert ID to retrieve
+        start_time: Optional start of time range filter
+        end_time: Optional end of time range filter
+        severity: Optional severity filter (low, medium, high, critical)
+        resource_type: Optional resource type filter (Server, AWS, GCP, Azure)
+        limit: Maximum number of records to return (default: 100, max: 1000)
+        offset: Number of records to skip for pagination (default: 0)
+    
+    Returns:
+        Dictionary containing:
+            - alerts: List of alert dictionaries
+            - total: Total number of records matching filters
+            - limit: Current limit
+            - offset: Current offset
+    """
+    if not PSYCOPG2_AVAILABLE:
+        return {
+            "alerts": [],
+            "total": 0,
+            "limit": limit,
+            "offset": offset,
+            "error": "psycopg2 library is not available"
+        }
+    
+    conn = None
+    cursor = None
+    
+    try:
+        conn = connect_to_db()
+        if conn is None:
+            return {
+                "alerts": [],
+                "total": 0,
+                "limit": limit,
+                "offset": offset,
+                "error": "Failed to connect to database"
+            }
+        
+        cursor = conn.cursor()
+        
+        # Validate limit
+        if limit < 1 or limit > 1000:
+            limit = 100
+        if offset < 0:
+            offset = 0
+        
+        # Build query
+        query = "SELECT id, metric_name, value, timestamp, resource_type, severity, action_taken FROM alerts WHERE 1=1"
+        params = []
+        
+        # Add filters
+        if alert_id is not None:
+            query += " AND id = %s"
+            params.append(alert_id)
+        
+        if start_time:
+            query += " AND timestamp >= %s"
+            params.append(start_time)
+        
+        if end_time:
+            query += " AND timestamp <= %s"
+            params.append(end_time)
+        
+        if severity:
+            query += " AND severity = %s"
+            params.append(severity)
+        
+        if resource_type:
+            query += " AND resource_type = %s"
+            params.append(resource_type)
+        
+        # Get total count
+        count_query = query.replace("SELECT id, metric_name, value, timestamp, resource_type, severity, action_taken", "SELECT COUNT(*)")
+        cursor.execute(count_query, params)
+        total = cursor.fetchone()[0]
+        
+        # Add ordering and pagination
+        query += " ORDER BY timestamp DESC LIMIT %s OFFSET %s"
+        params.extend([limit, offset])
+        
+        # Execute query
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        # Convert to dictionaries
+        alerts = []
+        for row in rows:
+            alerts.append({
+                "id": row[0],
+                "metric_name": row[1],
+                "value": float(row[2]) if row[2] is not None else None,
+                "timestamp": row[3].isoformat() if isinstance(row[3], datetime) else str(row[3]),
+                "resource_type": row[4],
+                "severity": row[5],
+                "action_taken": row[6]
+            })
+        
+        cursor.close()
+        conn.close()
+        
+        return {
+            "alerts": alerts,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }
+    
+    except Error as e:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+        return {
+            "alerts": [],
+            "total": 0,
+            "limit": limit,
+            "offset": offset,
+            "error": f"Database error: {str(e)}"
+        }
+    except Exception as e:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+        return {
+            "alerts": [],
+            "total": 0,
+            "limit": limit,
+            "offset": offset,
+            "error": f"Unexpected error: {str(e)}"
+        }
+
+
 def get_database_connection(connection_string: str) -> DatabaseConnection:
     """
     Create and return a database connection.
@@ -2074,3 +2270,139 @@ def get_database_connection(connection_string: str) -> DatabaseConnection:
     """
     # TODO: Implement connection pooling if needed
     return DatabaseConnection(connection_string)
+
+
+def initialize_database() -> bool:
+    """
+    Initialize the database by creating all required schemas.
+    
+    This function connects to the database and creates all necessary tables:
+    - system_metrics
+    - cloud_metrics
+    - cloud_server_metrics (unified metrics)
+    - alerts (with severity and action_taken columns)
+    - self_healing_log
+    - cloud_resource_costs
+    - model_performance
+    - resource_policies
+    
+    Each schema creation function commits independently. The function is idempotent
+    and safe to call multiple times (uses CREATE TABLE IF NOT EXISTS).
+    Partial success is acceptable - if some schemas fail, the successful ones remain.
+    
+    Returns:
+        True if all schemas created successfully, False otherwise
+    
+    Raises:
+        RuntimeError: If psycopg2 is not available
+    """
+    if not PSYCOPG2_AVAILABLE:
+        raise RuntimeError(
+            "psycopg2 library is not available. Please install it using: pip install psycopg2-binary"
+        )
+    
+    conn = None
+    try:
+        # Connect to database
+        conn = connect_to_db()
+        if conn is None:
+            # Get the database URL to show in error message
+            settings = get_settings()
+            database_url = settings.database_url if settings else "not configured"
+            
+            # Mask password in URL for security
+            if "@" in database_url and "://" in database_url:
+                try:
+                    # urlparse is already imported at module level
+                    parsed = urlparse(database_url)
+                    masked_url = f"{parsed.scheme}://{parsed.username}:***@{parsed.hostname}:{parsed.port or 5432}{parsed.path}"
+                except Exception:
+                    masked_url = database_url
+            else:
+                masked_url = database_url
+            
+            error_msg = (
+                f"Error: Failed to connect to database. "
+                f"Please check your DATABASE_URL environment variable. "
+                f"Current value: {masked_url}. "
+                f"Format: postgresql://username:password@host:port/dbname"
+            )
+            try:
+                from utils.logger import get_logger
+                logger = get_logger(__name__)
+                logger.error(error_msg)
+            except ImportError:
+                print(error_msg)
+            return False
+        
+        # Track which schemas were created successfully
+        schemas_created = []
+        schemas_failed = []
+        
+        # Create main schema (creates most tables)
+        # Note: Each schema creation function commits independently
+        if create_schema(conn):
+            schemas_created.append("system_metrics, cloud_metrics, cloud_server_metrics, alerts, cloud_resource_costs, model_performance, resource_policies, self_healing_log")
+        else:
+            schemas_failed.append("main schema (system_metrics, cloud_metrics, etc.)")
+        
+        # Create alerts schema with migrations (ensures severity and action_taken columns exist)
+        if create_alerts_schema(conn):
+            schemas_created.append("alerts (with migrations)")
+        else:
+            schemas_failed.append("alerts schema (migrations)")
+        
+        # Create unified metrics schema (redundant but ensures it exists)
+        if create_unified_metrics_schema(conn):
+            schemas_created.append("cloud_server_metrics (unified)")
+        else:
+            schemas_failed.append("cloud_server_metrics schema")
+        
+        # Check if all schemas were created successfully
+        if schemas_failed:
+            # Some schemas failed - report but don't rollback (they already committed)
+            error_msg = f"Database initialization partially failed. Created: {schemas_created}, Failed: {schemas_failed}"
+            try:
+                from utils.logger import get_logger
+                logger = get_logger(__name__)
+                logger.warning(error_msg)
+            except ImportError:
+                print(error_msg)
+            return False
+        else:
+            # All schemas created successfully
+            success_msg = f"Database initialized successfully. Created schemas: {', '.join(schemas_created)}"
+            try:
+                from utils.logger import get_logger
+                logger = get_logger(__name__)
+                logger.info(success_msg)
+            except ImportError:
+                print(success_msg)
+            return True
+    
+    except RuntimeError as e:
+        # Re-raise RuntimeError (e.g., psycopg2 not available)
+        error_msg = f"Database initialization error: {e}"
+        try:
+            from utils.logger import get_logger
+            logger = get_logger(__name__)
+            logger.error(error_msg)
+        except ImportError:
+            print(error_msg)
+        raise
+    
+    except Exception as e:
+        # Log error (no rollback needed as individual functions commit independently)
+        error_msg = f"Unexpected error initializing database: {e}"
+        try:
+            from utils.logger import get_logger
+            logger = get_logger(__name__)
+            logger.error(error_msg, exc_info=True)
+        except ImportError:
+            print(error_msg)
+        return False
+    
+    finally:
+        # Always close connection
+        if conn:
+            conn.close()
