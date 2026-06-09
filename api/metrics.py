@@ -203,13 +203,69 @@ async def collect_and_store_metrics_endpoint(request: Request):
         RateLimitExceeded: 429 if rate limit is exceeded
     """
     try:
-        # Collect all metrics
+        # Collect system metrics
         cpu_data = get_cpu_usage()
         memory_data = get_memory_usage()
         network_data = get_network_traffic()
         
         # Get unified timestamp
         current_timestamp = datetime.now().isoformat()
+        current_datetime = datetime.now()
+        
+        # Collect cloud metrics (if enabled)
+        cloud_cost_data = None
+        cloud_compute = None
+        cloud_storage = None
+        cloud_bandwidth = None
+        cloud_resource_type = "Server"  # Default to Server
+        
+        try:
+            from data_collection.cloud_metrics import get_cloud_costs
+            from config.settings import get_settings
+            
+            settings = get_settings()
+            if settings and settings.enable_cloud_metrics:
+                print("[DEBUG] Cloud metrics enabled, collecting cloud costs...")
+                cloud_cost_data = get_cloud_costs(provider=None, store_in_db=True)
+                
+                if cloud_cost_data and cloud_cost_data.get('cloud_cost'):
+                    cost_items = cloud_cost_data.get('cloud_cost', [])
+                    total_cost = cloud_cost_data.get('total_cost', 0.0)
+                    
+                    # Extract cloud metrics from cost data
+                    # Calculate aggregate values for cloud_compute, cloud_storage, cloud_bandwidth
+                    for cost_item in cost_items:
+                        resource_name = cost_item.get('resource_name', '')
+                        resource_usage = cost_item.get('resource_usage', 0.0)
+                        
+                        # Determine resource type from resource name
+                        if 'EC2' in resource_name or 'VM' in resource_name or 'Compute' in resource_name:
+                            if cloud_compute is None:
+                                cloud_compute = 0.0
+                            cloud_compute += resource_usage
+                            if 'AWS' in resource_name:
+                                cloud_resource_type = "AWS"
+                            elif 'Azure' in resource_name:
+                                cloud_resource_type = "Azure"
+                            elif 'GCP' in resource_name or 'Google' in resource_name:
+                                cloud_resource_type = "GCP"
+                        elif 'Storage' in resource_name or 'S3' in resource_name or 'Blob' in resource_name:
+                            if cloud_storage is None:
+                                cloud_storage = 0.0
+                            cloud_storage += resource_usage
+                        elif 'Network' in resource_name or 'Bandwidth' in resource_name:
+                            if cloud_bandwidth is None:
+                                cloud_bandwidth = 0.0
+                            cloud_bandwidth += resource_usage
+                    
+                    print(f"[DEBUG] Cloud metrics collected - Compute: {cloud_compute}, Storage: {cloud_storage}, Bandwidth: {cloud_bandwidth}, Total Cost: ${total_cost:.2f}")
+                else:
+                    print("[DEBUG] No cloud cost data collected (cloud may not be configured or no resources found)")
+        except ImportError as e:
+            print(f"[DEBUG] Cloud metrics module not available: {e}")
+        except Exception as e:
+            print(f"[DEBUG] Cloud metrics collection failed (non-critical): {e}")
+            # Don't fail the entire request if cloud collection fails
         
         # Store metrics in database
         storage_success = store_metrics(cpu_data, memory_data, network_data)
@@ -219,6 +275,50 @@ async def collect_and_store_metrics_endpoint(request: Request):
                 status_code=500,
                 detail="Failed to store metrics in database"
             )
+        
+        # Store unified metrics with cloud data if cloud metrics were collected
+        if cloud_compute is not None or cloud_storage is not None or cloud_bandwidth is not None:
+            try:
+                from data_collection.database import store_unified_metrics
+                
+                # Extract system metric values for unified storage
+                cpu_usage_percent = cpu_data.get('cpu_percent', 0.0)
+                if not isinstance(cpu_usage_percent, (int, float)):
+                    cpu_usage_percent = 0.0
+                
+                memory_usage_percent = 0.0
+                if isinstance(memory_data, dict):
+                    memory_usage_percent = memory_data.get('percent', 0.0)
+                    if memory_usage_percent is None:
+                        used = memory_data.get('used', 0)
+                        total = memory_data.get('total', 1)
+                        if total > 0:
+                            memory_usage_percent = (used / total) * 100.0
+                
+                network_total_bytes = 0.0
+                if isinstance(network_data, dict):
+                    bytes_sent = network_data.get('bytes_sent', 0) or 0
+                    bytes_recv = network_data.get('bytes_recv', 0) or 0
+                    network_total_bytes = float(bytes_sent) + float(bytes_recv)
+                
+                # Store unified metrics with cloud data
+                unified_storage_success = store_unified_metrics(
+                    cpu_usage=float(cpu_usage_percent),
+                    memory_usage=float(memory_usage_percent),
+                    network_traffic=float(network_total_bytes),
+                    resource_type=cloud_resource_type,
+                    cloud_compute=cloud_compute,
+                    cloud_storage=cloud_storage,
+                    cloud_bandwidth=cloud_bandwidth,
+                    timestamp=current_datetime
+                )
+                if unified_storage_success:
+                    print(f"[DEBUG] Unified metrics stored with cloud data for {cloud_resource_type}")
+                else:
+                    print("[DEBUG] Warning: Failed to store unified metrics with cloud data")
+            except Exception as e:
+                print(f"[DEBUG] Failed to store unified metrics with cloud data: {e}")
+                # Don't fail the entire request if unified storage fails
         
         # Evaluate policies and trigger alerts dynamically
         alerts_triggered = []
@@ -313,6 +413,56 @@ async def collect_and_store_metrics_endpoint(request: Request):
                 import traceback
                 traceback.print_exc()
         
+        # Evaluate cloud cost policies if cloud metrics were collected
+        if cloud_cost_data and cloud_cost_data.get('total_cost') is not None:
+            try:
+                total_cost = cloud_cost_data.get('total_cost', 0.0)
+                if isinstance(total_cost, (int, float)) and total_cost > 0:
+                    # Build cloud cost metrics dictionary for policy evaluation
+                    cloud_metrics_dict = {"Cloud Cost": float(total_cost)}
+                    
+                    print(f"[DEBUG] Evaluating cloud cost policies for total_cost=${total_cost:.2f}, resource_type={cloud_resource_type}")
+                    
+                    # Check thresholds using policies from database
+                    cloud_policy_alerts = check_thresholds_with_policies(
+                        metrics=cloud_metrics_dict,
+                        resource_type=cloud_resource_type
+                    )
+                    
+                    if cloud_policy_alerts:
+                        # Add cloud alerts to the alerts_triggered list
+                        if alerts_triggered is None:
+                            alerts_triggered = []
+                        alerts_triggered.extend(cloud_policy_alerts)
+                        print(f"[DEBUG] Cloud cost policy evaluation triggered {len(cloud_policy_alerts)} alert(s)")
+                        # Log for debugging
+                        try:
+                            from utils.logger import get_logger
+                            logger = get_logger(__name__)
+                            logger.info(f"Cloud cost policy evaluation triggered {len(cloud_policy_alerts)} alert(s)")
+                        except ImportError:
+                            pass
+                    else:
+                        print(f"[DEBUG] Cloud cost policy evaluation completed: no alerts triggered yet (may be tracking duration)")
+            except ImportError as e:
+                # Policy checking not available - log but don't fail
+                try:
+                    from utils.logger import get_logger
+                    logger = get_logger(__name__)
+                    logger.warning(f"Cloud cost policy checking not available: {e}")
+                except ImportError:
+                    pass
+            except Exception as e:
+                # Log error but don't fail the metric collection
+                try:
+                    from utils.logger import get_logger
+                    logger = get_logger(__name__)
+                    logger.error(f"Error during cloud cost policy evaluation: {e}", exc_info=True)
+                except ImportError:
+                    print(f"ERROR during cloud cost policy evaluation: {e}")
+                    import traceback
+                    traceback.print_exc()
+        
         # Build response
         response = {
             "status": "success",
@@ -324,6 +474,23 @@ async def collect_and_store_metrics_endpoint(request: Request):
             },
             "timestamp": current_timestamp
         }
+        
+        # Add cloud metrics to response if collected
+        if cloud_cost_data:
+            response["cloud_metrics"] = {
+                "total_cost": cloud_cost_data.get('total_cost', 0.0),
+                "cloud_cost_items": cloud_cost_data.get('cloud_cost', []),
+                "resource_type": cloud_resource_type,
+                "cloud_compute": cloud_compute,
+                "cloud_storage": cloud_storage,
+                "cloud_bandwidth": cloud_bandwidth
+            }
+        else:
+            # Indicate cloud metrics were not collected (disabled or not configured)
+            response["cloud_metrics"] = {
+                "total_cost": None,
+                "message": "Cloud metrics not collected (disabled or not configured)"
+            }
         
         # Add alerts information if any were triggered
         if alerts_triggered:
