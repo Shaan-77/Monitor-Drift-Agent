@@ -70,6 +70,12 @@ class PolicyUpdateRequest(BaseModel):
     enabled: Optional[bool] = Field(None, description="Updated enabled status")
 
 
+class BatchPolicyCreateRequest(BaseModel):
+    """Request model for creating multiple policies at once."""
+    policies: List[PolicyCreateRequest] = Field(..., description="List of policies to create")
+    replace_existing: bool = Field(default=False, description="If True, delete existing policies before creating new ones")
+
+
 # API key verification (similar to metrics.py)
 async def verify_api_key(x_api_key: Optional[str] = Header(None, alias="X-API-KEY")) -> bool:
     """
@@ -265,6 +271,112 @@ async def create_policy(
         raise HTTPException(
             status_code=500,
             detail=f"Unexpected error creating policy: {str(e)}"
+        )
+
+
+@router.post("/batch", status_code=201)
+async def create_policies_batch(
+    request: BatchPolicyCreateRequest,
+    api_key_valid: bool = Depends(verify_api_key)
+) -> Dict[str, Any]:
+    """
+    Create multiple resource policies at once (system + cloud metrics).
+    
+    This endpoint allows you to create all policies (CPU, Memory, Network, Cloud Cost)
+    in a single request, making it convenient to set up complete monitoring.
+    
+    Args:
+        request: BatchPolicyCreateRequest containing list of policies to create
+    
+    Returns:
+        Dictionary containing created policies information
+    
+    Raises:
+        HTTPException: 400 if validation fails
+        HTTPException: 401 if API key authentication fails
+        HTTPException: 500 if database storage fails
+    """
+    if not POLICY_DB_AVAILABLE or create_resource_policy is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Policy management module not available"
+        )
+    
+    try:
+        created_policies = []
+        failed_policies = []
+        
+        # If replace_existing is True, delete all existing policies first
+        if request.replace_existing:
+            try:
+                existing_policies = list_resource_policies_from_db(enabled_only=False)
+                for policy in existing_policies:
+                    if policy.policy_id:
+                        delete_resource_policy_in_db(policy.policy_id)
+                print(f"[DEBUG] Deleted {len(existing_policies)} existing policies")
+            except Exception as e:
+                print(f"[DEBUG] Warning: Failed to delete existing policies: {e}")
+        
+        # Create each policy
+        for policy_request in request.policies:
+            try:
+                # Validate threshold_type
+                valid_types = ['usage', 'cost']
+                if policy_request.threshold_type.lower() not in valid_types:
+                    failed_policies.append({
+                        "resource_name": policy_request.resource_name,
+                        "error": f"threshold_type must be one of: {', '.join(valid_types)}"
+                    })
+                    continue
+                
+                # Create policy
+                policy = create_resource_policy(
+                    resource_name=policy_request.resource_name,
+                    threshold_value=policy_request.threshold_value,
+                    threshold_type=policy_request.threshold_type.lower(),
+                    duration=policy_request.duration,
+                    enabled=policy_request.enabled,
+                    store_in_db=False
+                )
+                
+                # Store in database
+                policy_id = store_resource_policy_in_db(policy)
+                
+                if policy_id:
+                    # Retrieve stored policy
+                    stored_policy = get_resource_policy_from_db(policy_id=policy_id)
+                    if stored_policy:
+                        created_policies.append(stored_policy.to_dict())
+                        print(f"[DEBUG] Created policy: {policy_request.resource_name} (ID: {policy_id})")
+                    else:
+                        failed_policies.append({
+                            "resource_name": policy_request.resource_name,
+                            "error": "Failed to retrieve created policy"
+                        })
+                else:
+                    failed_policies.append({
+                        "resource_name": policy_request.resource_name,
+                        "error": "Failed to store policy in database"
+                    })
+            except Exception as e:
+                failed_policies.append({
+                    "resource_name": policy_request.resource_name,
+                    "error": str(e)
+                })
+        
+        return {
+            "status": "success",
+            "message": f"Created {len(created_policies)} policy/policies, {len(failed_policies)} failed",
+            "policies": created_policies,
+            "failed": failed_policies if failed_policies else None,
+            "total_created": len(created_policies),
+            "total_failed": len(failed_policies)
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error creating policies: {str(e)}"
         )
 
 

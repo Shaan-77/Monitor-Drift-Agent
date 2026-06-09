@@ -1590,6 +1590,45 @@ def get_cloud_costs(provider: Optional[str] = None, store_in_db: bool = True) ->
             logger.error(f"Unexpected error collecting metrics from {prov}: {str(e)}", exc_info=True)
             continue
     
+    # If no real cloud data collected and simulation is enabled, use simulated data for testing
+    # This allows testing without real cloud credentials while still supporting real cloud when available
+    use_simulation = os.getenv("USE_SIMULATED_CLOUD_METRICS", "false").lower() == "true"
+    if not all_cost_data and use_simulation:
+        print("[DEBUG] Using simulated cloud cost data for testing (no real cloud credentials found)")
+        logger.info("Using simulated cloud cost data for testing (no real cloud credentials found)")
+        # Generate simulated cost data for testing
+        simulated_resources = [
+            ("AWS EC2", "aws", 75.0, 0.15),  # base_cost $75, ±15% variation
+            ("AWS S3 Storage", "aws", 25.0, 0.10),  # base_cost $25, ±10% variation
+            ("AWS Network", "aws", 15.0, 0.20),  # base_cost $15, ±20% variation
+        ]
+        for resource_name, provider, base_cost, variation in simulated_resources:
+            cost_item = generate_simulated_cloud_cost(resource_name, provider, base_cost, variation, current_time)
+            all_cost_data.append(cost_item)
+        print(f"[DEBUG] Generated {len(all_cost_data)} simulated cloud cost items for testing")
+        logger.info(f"Generated {len(all_cost_data)} simulated cloud cost items for testing")
+        # Add simulated usage metrics for completeness
+        for cost_item in all_cost_data:
+            resource_name = cost_item['resource_name']
+            metric_value = cost_item['resource_usage']
+            # Determine provider from resource name
+            prov = 'aws'  # Default to aws
+            if 'AWS' in resource_name:
+                prov = 'aws'
+            elif 'Azure' in resource_name:
+                prov = 'azure'
+            elif 'GCP' in resource_name or 'Google' in resource_name:
+                prov = 'gcp'
+            # Determine resource type
+            resource_type = 'Compute' if 'EC2' in resource_name or 'VM' in resource_name or 'Compute' in resource_name else 'Storage' if 'Storage' in resource_name or 'S3' in resource_name or 'Blob' in resource_name else 'Network'
+            all_usage_metrics.append({
+                'provider': prov,
+                'metric_name': resource_name,
+                'metric_value': metric_value,
+                'timestamp': current_time.isoformat(),
+                'resource_type': resource_type
+            })
+    
     # Calculate total cost
     total_cost = sum(item.get('cost', 0.0) for item in all_cost_data)
     
