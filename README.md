@@ -316,3 +316,5 @@ FM-1 GitLab webhook test 06/12/2026 21:22:27
 FM-1 GitLab webhook test 06/13/2026 12:51:05
 
 FM-1 ER-002 missing rollout plan test 06/13/2026 15:02:57
+
+FM-1 ER-002 softblock test v2 06/13/2026 20:40:27
