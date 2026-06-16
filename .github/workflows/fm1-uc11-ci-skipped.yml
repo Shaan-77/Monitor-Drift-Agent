@@ -12,9 +12,6 @@ on:
           - ci.check.skipped
           - ci.workflow.skipped
 
-permissions:
-  contents: read
-
 jobs:
   send-fm1-ci-signal:
     name: Send FM-1 CI skipped signal
@@ -32,6 +29,9 @@ jobs:
           EVENT_TYPE="${{ github.event.inputs.fm1_event }}"
           SOURCE_EVENT_ID="github-actions-uc11-${EVENT_TYPE}-${{ github.run_id }}"
           TRACE_ID="trace-github-actions-uc11-${EVENT_TYPE}-${{ github.run_id }}"
+          PIPELINE_ID="github-actions-${{ github.workflow }}-${{ github.run_id }}"
+          JOB_ID="${{ github.job }}"
+          RUN_ID="${{ github.run_id }}"
 
           if [ -z "${FM1_TENANT_ID}" ]; then
             echo "ERROR: GitHub Actions variable FM1_TENANT_ID is missing."
@@ -43,8 +43,14 @@ jobs:
             exit 1
           fi
 
+          if [ -z "${JOB_ID}" ]; then
+            echo "ERROR: GitHub job identity is missing."
+            exit 1
+          fi
+
           cat > payload.json <<EOF_PAYLOAD
           {
+            "schema_version": "fm1.common_response.v1.2.13",
             "tenant_id": "${FM1_TENANT_ID}",
             "release_id": "${FM1_RELEASE_ID}",
             "trace_id": "${TRACE_ID}",
@@ -54,12 +60,18 @@ jobs:
             "source_system": "ci_cd",
             "signal_method": "pipeline_job",
             "event_type_id": "${EVENT_TYPE}",
+            "pipeline_id": "${PIPELINE_ID}",
+            "job_id": "${JOB_ID}",
+            "run_id": "${RUN_ID}",
             "repository": "${{ github.repository }}",
             "branch": "${{ github.ref_name }}",
             "commit_hash": "${{ github.sha }}",
             "check_name": "required-build",
             "workflow_name": "${{ github.workflow }}",
             "workflow_run_id": "${{ github.run_id }}",
+            "workflow_run_attempt": "${{ github.run_attempt }}",
+            "runner_os": "${{ runner.os }}",
+            "runner_arch": "${{ runner.arch }}",
             "reason": "Manual UAT UC-11: CI check/workflow intentionally skipped"
           }
           EOF_PAYLOAD
