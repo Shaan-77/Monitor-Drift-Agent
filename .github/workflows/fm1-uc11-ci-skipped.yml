@@ -19,7 +19,7 @@ send-fm1-ci-signal:
 name: Send FM-1 CI skipped signal
 runs-on: ubuntu-latest
 
-```
+
 steps:
   - name: Build FM-1 payload
     shell: bash
@@ -107,4 +107,4 @@ steps:
         echo "FM-1 call returned non-2xx. Review response."
         exit 1
       fi
-```
+
