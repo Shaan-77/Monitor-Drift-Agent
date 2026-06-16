@@ -57,9 +57,9 @@ jobs:
             "workflow_run_id": "${{ github.run_id }}",
             "reason": "Manual UAT UC-11: CI check/workflow intentionally skipped"
           }
-EOF_PAYLOAD
+            EOF_PAYLOAD
 
-          echo "Payload prepared:"
+          echo "Payload prepared:"  
           cat payload.json
 
       - name: Send CI skipped event to FM-1
