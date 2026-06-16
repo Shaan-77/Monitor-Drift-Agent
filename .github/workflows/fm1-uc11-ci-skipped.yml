@@ -1,67 +1,108 @@
 name: FM1 UC11 CI skipped signal
 
 on:
-  workflow_dispatch:
-    inputs:
-      fm1_event:
-        description: "FM-1 event to send"
-        required: true
-        default: "ci.check.skipped"
-        type: choice
-        options:
-          - ci.check.skipped
-          - ci.workflow.skipped
+workflow_dispatch:
+inputs:
+fm1_event:
+description: "FM-1 event to send"
+required: true
+default: "ci.check.skipped"
+type: choice
+options:
+- ci.check.skipped
+- ci.workflow.skipped
 
 jobs:
-  send-fm1-ci-signal:
-    name: Send FM-1 CI skipped signal
-    runs-on: ubuntu-latest
+send-fm1-ci-signal:
+name: Send FM-1 CI skipped signal
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Build FM-1 payload
-        shell: bash
-        run: |
-          EVENT_TYPE="${{ github.event.inputs.fm1_event }}"
-          SOURCE_EVENT_ID="github-actions-uc11-${EVENT_TYPE}-${{ github.run_id }}"
+```
+steps:
+  - name: Build FM-1 payload
+    shell: bash
+    env:
+      FM1_TENANT_ID: ${{ vars.FM1_TENANT_ID }}
+      FM1_RELEASE_ID: ${{ vars.FM1_RELEASE_ID }}
+    run: |
+      set -euo pipefail
 
-          cat > payload.json <<EOF
-          {
-            "tenant_id": "${{ vars.FM1_TENANT_ID }}",
-            "release_id": "${{ vars.FM1_RELEASE_ID }}",
-            "source_event_id": "${SOURCE_EVENT_ID}",
-            "provider": "github_actions",
-            "platform": "GitHub Actions",
-            "source_system": "ci_cd",
-            "signal_method": "pipeline_job",
-            "event_type_id": "${EVENT_TYPE}",
-            "repository": "${{ github.repository }}",
-            "branch": "${{ github.ref_name }}",
-            "commit_hash": "${{ github.sha }}",
-            "check_name": "required-build",
-            "workflow_name": "${{ github.workflow }}",
-            "workflow_run_id": "${{ github.run_id }}",
-            "reason": "Manual UAT UC-11: CI check/workflow intentionally skipped"
-          }
-          EOF
+      EVENT_TYPE="${{ github.event.inputs.fm1_event }}"
+      SOURCE_EVENT_ID="github-actions-uc11-${EVENT_TYPE}-${{ github.run_id }}"
 
-          echo "Payload prepared:"
-          cat payload.json
+      if [ -z "${FM1_TENANT_ID}" ]; then
+        echo "ERROR: GitHub Actions variable FM1_TENANT_ID is missing."
+        exit 1
+      fi
 
-      - name: Send CI skipped event to FM-1
-        shell: bash
-        run: |
-          set +e
+      if [ -z "${FM1_RELEASE_ID}" ]; then
+        echo "ERROR: GitHub Actions variable FM1_RELEASE_ID is missing."
+        exit 1
+      fi
 
-          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" \
-            -X POST "${{ vars.FM1_BASE_URL }}/fm1/v1/ci/signals" \
-            -H "Content-Type: application/json" \
-            --data @payload.json)
+      cat > payload.json <<EOF
+      {
+        "tenant_id": "${FM1_TENANT_ID}",
+        "release_id": "${FM1_RELEASE_ID}",
+        "source_event_id": "${SOURCE_EVENT_ID}",
+        "provider": "github_actions",
+        "platform": "GitHub Actions",
+        "source_system": "ci_cd",
+        "signal_method": "pipeline_job",
+        "event_type_id": "${EVENT_TYPE}",
+        "repository": "${{ github.repository }}",
+        "branch": "${{ github.ref_name }}",
+        "commit_hash": "${{ github.sha }}",
+        "check_name": "required-build",
+        "workflow_name": "${{ github.workflow }}",
+        "workflow_run_id": "${{ github.run_id }}",
+        "reason": "Manual UAT UC-11: CI check/workflow intentionally skipped"
+      }
+      EOF
 
-          echo "FM-1 HTTP status: ${HTTP_CODE}"
-          echo "FM-1 response:"
-          cat response.json || true
+      echo "Payload prepared:"
+      cat payload.json
 
-          if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
-            echo "FM-1 call returned non-2xx. This may still be policy-blocking behavior, but the transport/API response must be reviewed."
-            exit 1
-          fi
+  - name: Send CI skipped event to FM-1
+    shell: bash
+    env:
+      FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+      FM1_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}
+    run: |
+      set +e
+
+      if [ -z "${FM1_BASE_URL}" ]; then
+        echo "ERROR: GitHub Actions variable FM1_BASE_URL is missing."
+        exit 1
+      fi
+
+      if [ -z "${FM1_TOKEN}" ]; then
+        echo "ERROR: GitHub Actions secret FM1_SIGNAL_INTAKE_AUTH_TOKEN is missing or empty."
+        exit 1
+      fi
+
+      echo "FM-1 token secret is present. Token length: ${#FM1_TOKEN}"
+      echo "Sending to: ${FM1_BASE_URL}/fm1/v1/ci/signals"
+
+      HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" \
+        -X POST "${FM1_BASE_URL}/fm1/v1/ci/signals" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${FM1_TOKEN}" \
+        -H "X-FM1-Signal-Intake-Auth-Token: ${FM1_TOKEN}" \
+        -H "X-FM1-Auth-Token: ${FM1_TOKEN}" \
+        --data @payload.json)
+
+      echo "FM-1 HTTP status: ${HTTP_CODE}"
+      echo "FM-1 response:"
+      cat response.json || true
+
+      if [ "${HTTP_CODE}" -eq 401 ]; then
+        echo "AUTH FAILED: FM-1 endpoint was reached, but intake auth failed."
+        exit 1
+      fi
+
+      if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
+        echo "FM-1 call returned non-2xx. Review response."
+        exit 1
+      fi
+```
