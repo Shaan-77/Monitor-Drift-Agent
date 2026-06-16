@@ -1,16 +1,18 @@
 name: FM1 UC11 CI skipped signal
 
+
+
 on:
-workflow_dispatch:
-inputs:
-fm1_event:
-description: "FM-1 event to send"
-required: true
-default: "ci.check.skipped"
-type: choice
-options:
-- ci.check.skipped
-- ci.workflow.skipped
+  workflow_dispatch:
+    inputs:
+      fm1_event:
+        description: "FM-1 event to send"
+        required: true
+        default: "ci.check.skipped"
+        type: choice
+        options:
+          - ci.check.skipped
+          - ci.workflow.skipped
 
 jobs:
 send-fm1-ci-signal:
