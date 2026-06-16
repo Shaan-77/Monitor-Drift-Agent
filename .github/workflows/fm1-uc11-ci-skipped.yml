@@ -12,6 +12,9 @@ on:
           - ci.check.skipped
           - ci.workflow.skipped
 
+permissions:
+  contents: read
+
 jobs:
   send-fm1-ci-signal:
     name: Send FM-1 CI skipped signal
@@ -28,6 +31,7 @@ jobs:
 
           EVENT_TYPE="${{ github.event.inputs.fm1_event }}"
           SOURCE_EVENT_ID="github-actions-uc11-${EVENT_TYPE}-${{ github.run_id }}"
+          TRACE_ID="trace-github-actions-uc11-${EVENT_TYPE}-${{ github.run_id }}"
 
           if [ -z "${FM1_TENANT_ID}" ]; then
             echo "ERROR: GitHub Actions variable FM1_TENANT_ID is missing."
@@ -43,6 +47,7 @@ jobs:
           {
             "tenant_id": "${FM1_TENANT_ID}",
             "release_id": "${FM1_RELEASE_ID}",
+            "trace_id": "${TRACE_ID}",
             "source_event_id": "${SOURCE_EVENT_ID}",
             "provider": "github_actions",
             "platform": "GitHub Actions",
@@ -87,6 +92,7 @@ jobs:
             -X POST "${FM1_BASE_URL}/fm1/v1/ci/signals" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${FM1_TOKEN}" \
+            -H "X-ZeroUI-Intake-Token: ${FM1_TOKEN}" \
             -H "X-FM1-Signal-Intake-Auth-Token: ${FM1_TOKEN}" \
             -H "X-FM1-Auth-Token: ${FM1_TOKEN}" \
             --data @payload.json)
@@ -97,6 +103,11 @@ jobs:
 
           if [ "${HTTP_CODE}" -eq 401 ]; then
             echo "AUTH FAILED: FM-1 endpoint was reached, but intake auth failed."
+            exit 1
+          fi
+
+          if [ "${HTTP_CODE}" -eq 400 ]; then
+            echo "BAD REQUEST: FM-1 rejected the signal envelope. Review response reason_code."
             exit 1
           fi
 
