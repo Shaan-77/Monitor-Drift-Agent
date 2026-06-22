@@ -1,0 +1,13 @@
+﻿name: FM1-UAT-Failing-Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  fm1-failing-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Intentional FM1 Event 21 failure
+        run: exit 1
