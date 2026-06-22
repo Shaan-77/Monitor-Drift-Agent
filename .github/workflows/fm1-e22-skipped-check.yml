@@ -1,0 +1,14 @@
+﻿name: FM1-UAT-Skipped-Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  fm1-skipped-check:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: This should be skipped
+        run: echo "This should not run"
