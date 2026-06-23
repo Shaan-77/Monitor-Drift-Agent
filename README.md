@@ -4,7 +4,7 @@ A comprehensive monitoring and anomaly detection agent for system metrics and cl
 
 ## Overview
 
-The Monitor/Drift Agent is designed to:
+The Monitor/Drift Agent is designed tod:
 - Collect system metrics (CPU, memory, disk, network) and cloud usage metrics
 - Detect anomalies using threshold-based and machine learning methods
 - Enforce policies for monitoring and alerting
@@ -293,7 +293,8 @@ For issues and questions:
 ## Notes
 
 This is a skeleton implementation. All modules contain TODO comments indicating where full implementation is needed. The structure is designed to be modular and scalable, allowing for independent development of each component.
-#   M o n i t o r - D r i f t - A g e n t  
+#   M o n i t o r - D r i f t - A g e n t 
+ 
  
 FM-1 GitLab webhook test 06/12/2026 17:56:13
 
