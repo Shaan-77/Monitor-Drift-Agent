@@ -5,11 +5,13 @@ A comprehensive monitoring and anomaly detection agent for system metrics and cl
 ## Overview
 
 The Monitor/Drift Agent is designed to:
+
 - Collect system metrics (CPU, memory, disk, network) and cloud usage metrics
 - Detect anomalies using threshold-based and machine learning methods
 - Enforce policies for monitoring and alerting
 - Send alerts through multiple channels (email, Slack, SMS)
 - Optionally perform self-healing actions (auto-scaling, shutdown)
+  asldjf
 
 ## Project Structure
 
@@ -68,26 +70,31 @@ monitor_drift_agent/
 ## Features
 
 ### Data Collection
+
 - **System Metrics**: Collect CPU, memory, disk, and network statistics
 - **Cloud Metrics**: Support for AWS, Azure, and GCP cost and resource metrics
 - **Database Integration**: PostgreSQL for persistent storage
 
 ### Anomaly Detection
+
 - **Threshold-Based**: Configurable threshold rules for metric monitoring
 - **Machine Learning**: Optional ML-based detection using Isolation Forest and Autoencoders
 - **Alert Triggering**: Automatic alert generation for detected anomalies
 
 ### Policy Management
+
 - **Policy Definition**: Create and manage monitoring policies
 - **Policy Enforcement**: Automatic policy evaluation and action execution
 - **Flexible Rules**: Support for complex conditions and actions
 
 ### Alerting
+
 - **Multi-Channel**: Email, Slack, and SMS notifications
 - **Alert Logging**: Persistent storage of all alerts
 - **Alert History**: Query and analyze historical alerts
 
 ### Self-Healing (Optional)
+
 - **Auto-Scaling**: Automatic resource scaling based on cost spikes
 - **Service Shutdown**: Graceful shutdown of services when needed
 
@@ -103,24 +110,28 @@ monitor_drift_agent/
 ### Local Development Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd monitor_drift_agent
    ```
 
 2. **Create virtual environment**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. **Install dependencies**
+
    ```bash
    # TODO: Create requirements.txt with project dependencies
    # pip install -r requirements.txt
    ```
 
 4. **Set up environment variables**
+
    ```bash
    # Copy example environment file
    # cp .env.example .env
@@ -138,12 +149,14 @@ monitor_drift_agent/
 ### Docker Setup
 
 1. **Build and run with Docker Compose**
+
    ```bash
    cd docker
    docker-compose up -d
    ```
 
 2. **View logs**
+
    ```bash
    docker-compose logs -f agent
    ```
@@ -158,27 +171,33 @@ monitor_drift_agent/
 Configuration is managed through environment variables. Key settings include:
 
 ### Database Configuration
+
 - `DATABASE_URL`: PostgreSQL connection string
 
 ### Metric Collection
+
 - `METRIC_COLLECTION_INTERVAL`: Collection interval in seconds (default: 60)
 
 ### Thresholds
+
 - `DEFAULT_CPU_THRESHOLD`: Default CPU usage threshold (default: 80.0)
 - `DEFAULT_MEMORY_THRESHOLD`: Default memory usage threshold (default: 80.0)
 - `DEFAULT_DISK_THRESHOLD`: Default disk usage threshold (default: 80.0)
 
 ### Cloud Provider Credentials
+
 - AWS: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
 - Azure: `AZURE_SUBSCRIPTION_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`
 - GCP: `GCP_PROJECT_ID`, `GCP_CREDENTIALS_PATH`
 
 ### Alert Channels
+
 - Email: `EMAIL_SMTP_SERVER`, `EMAIL_SMTP_PORT`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`
 - Slack: `SLACK_WEBHOOK_URL`
 - SMS: `SMS_API_KEY`, `SMS_API_SECRET`, `SMS_FROM_NUMBER`
 
 ### Feature Flags
+
 - `ANOMALY_DETECTION_ENABLED`: Enable/disable anomaly detection (default: true)
 - `ML_DETECTION_ENABLED`: Enable/disable ML-based detection (default: false)
 - `SELF_HEALING_ENABLED`: Enable/disable self-healing (default: false)
@@ -198,6 +217,7 @@ docker-compose up agent
 ### API Endpoints
 
 The agent provides REST API endpoints for:
+
 - **Metrics**: `GET /api/metrics`, `POST /api/metrics/collect`
 - **Alerts**: `GET /api/alerts`, `POST /api/alerts`, `PUT /api/alerts/{id}`
 - **Policies**: `GET /api/policies`, `POST /api/policies`, `PUT /api/policies/{id}`
@@ -263,6 +283,7 @@ python -m pytest tests/ --cov=. --cov-report=html
 ## Contributing
 
 Contributions are welcome! Please:
+
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
@@ -276,6 +297,7 @@ Contributions are welcome! Please:
 ## Support
 
 For issues and questions:
+
 - Open an issue on GitHub
 - Contact: [Your contact information]
 
@@ -293,7 +315,8 @@ For issues and questions:
 ## Notes
 
 This is a skeleton implementation. All modules contain TODO comments indicating where full implementation is needed. The structure is designed to be modular and scalable, allowing for independent development of each component.
-#   M o n i t o r - D r i f t - A g e n t  
+#   M o n i t o r - D r i f t - A g e n t 
+ 
  
 FM-1 GitLab webhook test 06/12/2026 17:56:13
 
