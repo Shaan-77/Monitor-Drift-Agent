@@ -1,4 +1,4 @@
-name: FM-1 ER-028 check failed
+name: FM-1 er-028 check failed
 on:
   pull_request:
     branches: [main]
@@ -10,4 +10,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Fail on purpose
-        run: echo ok
+        run: exit 1
