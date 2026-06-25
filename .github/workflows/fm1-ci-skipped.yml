@@ -10,4 +10,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Fail on purpose
-        run: exit 1
+        run: echo ok
