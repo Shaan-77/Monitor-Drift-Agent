@@ -1,0 +1,4 @@
+TEST-ONLY FM-1 TRIGGER SIMULATION
+run_id=run-075b45da77e845c693b2d19ed1d556fd
+event=git.tag.moved
+harmless simulator marker file
