@@ -1,0 +1,6 @@
+{
+  "event": "git.force_push.detected",
+  "purpose": "provider-event-simulation",
+  "recipe": "repo-007",
+  "run_id": "run-5cb55b21be0a481ba7703c9a6f6e83e8"
+}
