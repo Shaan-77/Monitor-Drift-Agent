@@ -1,0 +1,7 @@
+{
+  "created_at": "2026-08-01T09:03:51.430979+00:00",
+  "expected_decision": "hard_block",
+  "expected_er": "ER-028",
+  "recipe_id": "repo-022",
+  "run_id": "run-d227cc49fc7c466aa50d740196d63d4f"
+}
