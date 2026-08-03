@@ -1,3 +1,2 @@
-.env
-errors.log
-Gitlab-guide.md
+.vscode
+sec.env

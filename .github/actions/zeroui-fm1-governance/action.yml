@@ -1,0 +1,27 @@
+name: ZeroUI FM-1 Governance Gate
+description: "Builds and sends a ZeroUI FM-1 CI signal, then enforces the returned governance decision."
+
+inputs:
+  evidence_file:
+    description: "Path to the scanner evidence file produced earlier in the workflow."
+    required: true
+  evidence_format:
+    description: "Evidence format. Supported: bandit."
+    required: true
+  event_type_id:
+    description: "Optional explicit FM-1 event type. If omitted, inferred from evidence_format."
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Execute ZeroUI FM-1 governance gate
+      shell: bash
+      env:
+        INPUT_EVIDENCE_FILE: ${{ inputs.evidence_file }}
+        INPUT_EVIDENCE_FORMAT: ${{ inputs.evidence_format }}
+        INPUT_EVENT_TYPE_ID: ${{ inputs.event_type_id }}
+      run: |
+        set -euo pipefail
+        python3 "${GITHUB_ACTION_PATH}/zeroui_fm1_governance.py"
