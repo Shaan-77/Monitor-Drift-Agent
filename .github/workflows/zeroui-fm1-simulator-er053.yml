@@ -1,0 +1,51 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-053 Simulator
+
+on:
+  push:
+    paths:
+      - ".github/workflows/zeroui-fm1-simulator-er053.yml"
+      - ".zeroui-simulator/ci/current/er053/**"
+      - ".zeroui-simulator/ci/current/scenario.json"
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er053-security-scan:
+    name: ZeroUI FM-1 ER-053 Simulator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Bandit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install bandit
+
+      - name: Run Bandit on managed ER-053 fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m bandit \
+            .zeroui-simulator/ci/current/er053/fixture/insecure_eval_demo.py \
+            -f json \
+            -o bandit-results.json || true
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("bandit-results.json").read_text(encoding="utf-8"))
+          print(json.dumps({"finding_count": len(report.get("results") or [])}, indent=2))
+          PY
+
+      - name: ZeroUI governance gate
+        uses: ./.zeroui-simulator/ci/current/er053/action
+        with:
+          evidence_file: bandit-results.json
+          evidence_format: bandit
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}
