@@ -124,10 +124,7 @@ def build_payload(event_type_id: str, context: Dict[str, Any]) -> Dict[str, Any]
     job_id = os.getenv("GITHUB_JOB") or "zeroui-governance-gate"
     trace_id = str(scenario.get("trace_id") or f"trace-gha-{event_type_id}-{run_id}-{run_attempt}")
     simulator_run_id = str(scenario.get("simulator_run_id") or "").strip()
-    if simulator_run_id:
-        source_event_id = f"tsim-er053-{simulator_run_id}-{run_attempt}"
-    else:
-        source_event_id = f"gha-{event_type_id}-{run_id}-{job_id}-{run_attempt}"
+    source_event_id = f"gha-{event_type_id}-{run_id}-{job_id}-{run_attempt}"
 
     return {
         "schema_version": 1,
