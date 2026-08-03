@@ -108,8 +108,8 @@ def default_branch_from_event() -> Optional[str]:
 def release_branch() -> str:
     return (
         os.getenv("GITHUB_BASE_REF")
-        or default_branch_from_event()
         or os.getenv("GITHUB_REF_NAME")
+        or default_branch_from_event()
         or "main"
     )
 
@@ -119,7 +119,7 @@ def build_payload(event_type_id: str, context: Dict[str, Any]) -> Dict[str, Any]
     run_id = os.getenv("GITHUB_RUN_ID") or "unknown-run"
     run_attempt = os.getenv("GITHUB_RUN_ATTEMPT") or "1"
     repository = os.getenv("GITHUB_REPOSITORY") or str(scenario.get("repository") or "unknown-repository")
-    branch = release_branch()
+    branch = str(scenario.get("branch") or "").strip() or release_branch()
     workflow_name = os.getenv("GITHUB_WORKFLOW") or str(scenario.get("workflow_name") or "unknown-workflow")
     job_id = os.getenv("GITHUB_JOB") or "zeroui-governance-gate"
     trace_id = str(scenario.get("trace_id") or f"trace-gha-{event_type_id}-{run_id}-{run_attempt}")
