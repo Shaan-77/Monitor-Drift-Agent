@@ -1,0 +1,160 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-020 Simulator
+
+on:
+  push:
+    paths:
+      - ".github/workflows/zeroui-fm1-simulator-er020.yml"
+      - ".zeroui-simulator/ci/current/er020/**"
+      - ".zeroui-simulator/ci/current/scenario.json"
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er020-artifact-attestation:
+    name: ZeroUI FM-1 ER-020 Simulator
+    runs-on: ubuntu-latest
+    env:
+      REAL_ARTIFACT_PATH: dist/monitor-drift-agent-${{ github.sha }}.tar.gz
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build real source-release artifact in CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          git archive \
+            --format=tar.gz \
+            --prefix="monitor-drift-agent-${GITHUB_SHA}/" \
+            -o "${REAL_ARTIFACT_PATH}" \
+            HEAD
+
+          if [ ! -f "${REAL_ARTIFACT_PATH}" ]; then
+            echo "Expected artifact was not created: ${REAL_ARTIFACT_PATH}"
+            exit 1
+          fi
+
+          echo "Artifact created by CI: ${REAL_ARTIFACT_PATH}"
+
+      - name: Verify artifact attestation is present
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          set +e
+          gh attestation verify "${REAL_ARTIFACT_PATH}" --repo "${GITHUB_REPOSITORY}" --format json > attestation-verify.json 2> attestation-verify.err
+          VERIFY_EXIT=$?
+          set -e
+
+          cat attestation-verify.err || true
+          cat attestation-verify.json || true
+
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import hashlib
+          from pathlib import Path
+
+          exit_code = int(os.environ.get("VERIFY_EXIT", "0"))
+          err_content = ""
+          if Path("attestation-verify.err").is_file():
+              err_content = Path("attestation-verify.err").read_text(encoding="utf-8").strip()
+
+          artifact_path = os.environ["REAL_ARTIFACT_PATH"]
+          if not Path(artifact_path).is_file():
+              print(f"Artifact not found: {artifact_path}")
+              exit(1)
+
+          with open(artifact_path, "rb") as f:
+              digest = hashlib.sha256(f.read()).hexdigest()
+
+          if exit_code == 0:
+              verification_status = "verified"
+              signature_present = True
+              signature_valid = True
+              provenance_present = True
+              provenance_valid = True
+              validation_passed = True
+              scan_passed = True
+              reason = "artifact_attestation_verified"
+          else:
+              # Check for infrastructure/network/CLI/API/token errors
+              infra_patterns = [
+                  r"dial tcp",
+                  r"lookup.*api\.github\.com",
+                  r"connection refused",
+                  r"unauthorized",
+                  r"bad credentials",
+                  r"rate limit",
+                  r"401", r"403", r"500", r"503", r"504",
+                  r"unauthenticated",
+                  r"token",
+                  r"timeout",
+                  r"network is unreachable",
+                  r"tls handshake",
+                  r"could not resolve host",
+                  r"command not found",
+              ]
+              is_infra_error = (exit_code == 127) or any(re.search(p, err_content, re.IGNORECASE) for p in infra_patterns)
+              if is_infra_error:
+                  print(f"::error::Infrastructure error during verification: {err_content}")
+                  raise SystemExit(f"Infrastructure or execution failure: {err_content}")
+
+              # Otherwise, it's a proven missing/invalid attestation
+              if "no attestations" in err_content.lower() or "does not have any attestations" in err_content.lower() or "could not find" in err_content.lower():
+                  verification_status = "missing"
+                  reason = "artifact_attestation_missing_or_invalid"
+              else:
+                  verification_status = "invalid"
+                  reason = "artifact_attestation_missing_or_invalid"
+
+              signature_present = False
+              signature_valid = False
+              provenance_present = False
+              provenance_valid = False
+              validation_passed = False
+              scan_passed = False
+
+          evidence = {
+              "event_type_id": "ci.artifact.unsigned",
+              "artifact_path": artifact_path,
+              "artifact_present": True,
+              "artifact_digest": digest,
+              "source_built_in_ci": True,
+              "signature_present": signature_present,
+              "signature_valid": signature_valid,
+              "provenance_present": provenance_present,
+              "provenance_valid": provenance_valid,
+              "validation_passed": validation_passed,
+              "scan_passed": scan_passed,
+              "reason": reason,
+              "attestation_provider": "github_artifact_attestations",
+              "verification_tool": "gh attestation verify",
+              "verification_status": verification_status
+          }
+
+          with open("artifact-attestation-evidence.json", "w", encoding="utf-8") as handle:
+              json.dump(evidence, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+
+          print("ZeroUI ER-020 artifact attestation evidence:")
+          print(json.dumps(evidence, indent=2, sort_keys=True))
+          PY
+
+      - name: ZeroUI governance gate
+        uses: ./.zeroui-simulator/ci/current/er020/action
+        with:
+          evidence_file: artifact-attestation-evidence.json
+          evidence_format: artifact-integrity-evidence
+          job_id: zeroui-fm1-er020-artifact-attestation
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}
