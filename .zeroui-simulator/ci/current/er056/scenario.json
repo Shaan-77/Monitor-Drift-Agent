@@ -1,0 +1,13 @@
+{
+  "branch": "zeroui-trigger-simulator/workspace/0d5770c03205",
+  "created_at": "2026-08-04T17:12:05.488493+00:00",
+  "event_type_id": "ci.workflow.cancelled",
+  "pre_trigger_head_sha": "82e502be70b2dcd349fe5e53f825c368d78ce2c9",
+  "pull_request_number": 46,
+  "recipe_id": "ci-003",
+  "repository": "Shaan-77/Monitor-Drift-Agent",
+  "scenario": "block",
+  "simulator_run_id": "run-293b9329ef924d278f6cfe47c11c53f8",
+  "trace_id": "tsim-run-293b9329ef924d278f6cfe47c11c53f8",
+  "workflow_name": "ZeroUI FM-1 ER-056 Detector"
+}

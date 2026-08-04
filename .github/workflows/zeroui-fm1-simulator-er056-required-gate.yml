@@ -1,0 +1,67 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-056 Required Gate
+run-name: ZeroUI ER-056 Required Gate ${{ inputs.simulator_run_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      simulator_run_id:
+        description: "ZeroUI simulator run correlation ID"
+        required: true
+        type: string
+      trace_id:
+        description: "ZeroUI trace ID"
+        required: true
+        type: string
+      scenario_commit_sha:
+        description: "Generated simulator commit SHA"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er056-required-gate:
+    name: ZeroUI FM-1 ER-056 Required Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify ER-056 scenario correlation
+        shell: bash
+        env:
+          SIMULATOR_RUN_ID: ${{ inputs.simulator_run_id }}
+          SCENARIO_COMMIT_SHA: ${{ inputs.scenario_commit_sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          scenario_path = Path(".zeroui-simulator/ci/current/er056/scenario.json")
+          if not scenario_path.is_file():
+              print(f"Missing scenario file: {scenario_path}", file=sys.stderr)
+              raise SystemExit(2)
+          scenario = json.loads(scenario_path.read_text(encoding="utf-8"))
+          expected_run = str(os.environ.get("SIMULATOR_RUN_ID") or "").strip()
+          expected_sha = str(os.environ.get("SCENARIO_COMMIT_SHA") or "").strip()
+          if str(scenario.get("simulator_run_id") or "") != expected_run:
+              print("Scenario simulator_run_id mismatch", file=sys.stderr)
+              raise SystemExit(2)
+          if expected_sha and str(scenario.get("created_commit_sha") or scenario.get("pre_trigger_head_sha") or "") not in {expected_sha, ""}:
+              if str(scenario.get("created_commit_sha") or "") != expected_sha:
+                  print("Scenario commit SHA mismatch", file=sys.stderr)
+                  raise SystemExit(2)
+          PY
+
+      - name: Await required-gate cancellation
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ZeroUI ER-056 required gate awaiting simulator cancellation..."
+          for _ in $(seq 1 120); do
+            sleep 10
+          done
