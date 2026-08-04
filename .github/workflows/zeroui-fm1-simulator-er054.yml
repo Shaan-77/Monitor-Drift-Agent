@@ -6,7 +6,6 @@ on:
     paths:
       - ".github/workflows/zeroui-fm1-simulator-er054.yml"
       - ".zeroui-simulator/ci/current/er054/**"
-      - ".zeroui-simulator/ci/current/scenario.json"
 
 permissions:
   contents: read

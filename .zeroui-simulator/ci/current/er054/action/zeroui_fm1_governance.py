@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 
-SCENARIO_PATH = Path(".zeroui-simulator/ci/current/scenario.json")
+SCENARIO_PATH = Path(".zeroui-simulator/ci/current/er054/scenario.json")
 EXPECTED_ER = "ER-054"
 
 
