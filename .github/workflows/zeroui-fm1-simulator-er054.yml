@@ -22,8 +22,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m venv "${ runner.temp }/er054-venv"
-          source "${ runner.temp }/er054-venv/bin/activate"
+          ER054_VENV="${RUNNER_TEMP}/er054-venv"
+          python3 -m venv "$ER054_VENV"
+          source "$ER054_VENV/bin/activate"
           python -m pip install --upgrade pip
           python -m pip install pip-licenses
           python -m pip install ./.zeroui-simulator/ci/current/er054/fixture/gpl_demo_package
@@ -32,7 +33,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          source "${ runner.temp }/er054-venv/bin/activate"
+          ER054_VENV="${RUNNER_TEMP}/er054-venv"
+          source "$ER054_VENV/bin/activate"
           cd .zeroui-simulator/ci/current/er054/fixture
           pip-licenses --format=json --output-file pip-licenses.json
 
