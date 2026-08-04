@@ -51,6 +51,7 @@ jobs:
           set +e
           gh attestation verify "${REAL_ARTIFACT_PATH}" --repo "${GITHUB_REPOSITORY}" --format json > attestation-verify.json 2> attestation-verify.err
           VERIFY_EXIT=$?
+          export VERIFY_EXIT
           set -e
 
           cat attestation-verify.err || true

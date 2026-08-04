@@ -400,17 +400,32 @@ def enforce_response(response: Dict[str, Any]) -> None:
         print("::error title=ZeroUI governance check failed::Receipt was not written.")
         raise SystemExit(1)
 
-    if decision in {"hard_block", "soft_block"}:
+    if decision in {"hard_block", "soft_block", "action_required"}:
         write_summary("❌ ZeroUI governance blocked this pipeline.", "Pipeline blocked by ZeroUI", summary_fields)
         print(f"::error title=ZeroUI governance blocked::ZeroUI returned {decision} for {er}. Active blockers: {blocker_count}.")
         print("ZeroUI governance blocked this pipeline.")
         raise SystemExit(1)
 
+    cli_exit_raw = pick(response, "cli_exit_code", "projections.ci_response.cli_exit_code")
+    try:
+        cli_exit_code = int(cli_exit_raw) if cli_exit_raw is not None else None
+    except (TypeError, ValueError):
+        cli_exit_code = None
+
     if decision == "pass":
+        if cli_exit_code not in (None, 0):
+            write_summary("❌ ZeroUI governance check failed.", "CLI exit code indicates block", summary_fields)
+            print("::error title=ZeroUI governance check failed::FM-1 cli_exit_code requires pipeline failure.")
+            raise SystemExit(1)
         write_summary("✅ ZeroUI governance check passed.", "Pipeline unblocked by ZeroUI", summary_fields)
         print(f"::notice title=ZeroUI governance check passed::ZeroUI returned pass for {er}. Receipt written. Active blockers: {blocker_count}.")
         print("ZeroUI governance check passed. Pipeline may continue.")
         return
+
+    if cli_exit_code not in (None, 0):
+        write_summary("❌ ZeroUI governance blocked this pipeline.", "CLI exit code indicates block", summary_fields)
+        print("::error title=ZeroUI governance blocked::FM-1 cli_exit_code requires pipeline failure.")
+        raise SystemExit(1)
 
     write_summary("❌ ZeroUI governance check failed.", "Unknown decision", summary_fields)
     print("::error title=ZeroUI governance check failed::Unknown or missing decision_outcome.")
