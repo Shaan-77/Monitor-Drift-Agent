@@ -11,19 +11,33 @@ import urllib.request
 from pathlib import Path
 
 EVIDENCE_PATH = Path(".zeroui-simulator/ci/current/er056/artifact/workflow-cancelled-evidence.json")
+DETECTOR_TRIGGER_PATH = Path(".zeroui-simulator/ci/current/er056/detector-trigger.json")
 TARGET_WORKFLOW_PATH = ".github/workflows/zeroui-fm1-simulator-er056-required-gate.yml"
 
 
-def env_required(name: str) -> str:
-    value = str(os.getenv(name) or "").strip()
-    if not value:
-        raise SystemExit(f"Missing required environment variable: {name}")
-    return value
+def read_json(path: Path) -> dict:
+    if not path.is_file():
+        raise SystemExit(f"Detector trigger file not found: {path}")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise SystemExit("Detector trigger file must be a JSON object")
+    return payload
+
+
+def trigger_required(name: str, trigger: dict) -> str:
+    value = trigger.get(name)
+    if value in (None, ""):
+        raise SystemExit(f"Missing required detector trigger field: {name}")
+    return str(value).strip() if not isinstance(value, (int, float)) else value
 
 
 def fetch_workflow_run(run_id: str) -> dict:
-    token = env_required("GITHUB_TOKEN")
-    repository = env_required("GITHUB_REPOSITORY")
+    token = str(os.getenv("GITHUB_TOKEN") or "").strip()
+    if not token:
+        raise SystemExit("GITHUB_TOKEN is required")
+    repository = str(os.getenv("GITHUB_REPOSITORY") or "").strip()
+    if not repository:
+        raise SystemExit("GITHUB_REPOSITORY is required")
     url = f"https://api.github.com/repos/{repository}/actions/runs/{run_id}"
     request = urllib.request.Request(
         url,
@@ -72,14 +86,24 @@ def build_evidence(run: dict, *, branch: str, commit_sha: str, repository: str) 
 
 
 def main() -> None:
-    expected_run_id = env_required("TARGET_WORKFLOW_RUN_ID")
-    expected_attempt = env_required("TARGET_WORKFLOW_RUN_ATTEMPT")
-    expected_path = env_required("TARGET_WORKFLOW_PATH")
-    expected_branch = env_required("TARGET_BRANCH")
-    expected_commit_sha = env_required("TARGET_COMMIT_SHA")
-    expected_repository = env_required("TARGET_REPOSITORY")
+    trigger = read_json(DETECTOR_TRIGGER_PATH)
+    expected_run_id = str(trigger_required("target_workflow_run_id", trigger))
+    expected_attempt = str(trigger_required("target_workflow_run_attempt", trigger))
+    expected_path = str(trigger_required("target_workflow_path", trigger))
+    expected_branch = str(trigger_required("target_branch", trigger))
+    expected_commit_sha = str(trigger_required("target_commit_sha", trigger))
+    expected_repository = str(os.getenv("GITHUB_REPOSITORY") or "").strip()
+    if not expected_repository:
+        raise SystemExit("GITHUB_REPOSITORY is required")
+    target_conclusion = str(trigger.get("target_conclusion") or "").strip().lower()
+    if target_conclusion != "cancelled":
+        raise SystemExit("detector trigger target_conclusion must be cancelled")
     if expected_path != TARGET_WORKFLOW_PATH:
         raise SystemExit("TARGET_WORKFLOW_PATH is not the managed ER-056 required gate")
+
+    detector_run_id = str(os.getenv("GITHUB_RUN_ID") or "").strip()
+    if detector_run_id and detector_run_id == expected_run_id:
+        raise SystemExit("Detector workflow run ID must not be used as the target workflow run ID")
 
     run = fetch_workflow_run(expected_run_id)
     if str(run.get("id") or "") != expected_run_id:

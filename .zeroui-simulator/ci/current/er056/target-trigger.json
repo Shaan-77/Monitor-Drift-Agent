@@ -1,0 +1,7 @@
+{
+  "expected_branch": "zeroui-trigger-simulator/workspace/0d5770c03205",
+  "expected_workflow_path": ".github/workflows/zeroui-fm1-simulator-er056-required-gate.yml",
+  "scenario_generation_id": "run-796b6191124a4ebfbaba5cd7934d124f:tsim-run-796b6191124a4ebfbaba5cd7934d124f",
+  "simulator_run_id": "run-796b6191124a4ebfbaba5cd7934d124f",
+  "trace_id": "tsim-run-796b6191124a4ebfbaba5cd7934d124f"
+}

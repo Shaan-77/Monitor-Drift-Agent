@@ -1,38 +1,13 @@
 # zeroui-simulator-owned
 name: ZeroUI FM-1 ER-056 Detector
-run-name: ZeroUI ER-056 Detector ${{ inputs.simulator_run_id }}
+run-name: ZeroUI ER-056 Detector ${{ github.sha }}
 
 on:
-  workflow_dispatch:
-    inputs:
-      simulator_run_id:
-        description: "ZeroUI simulator run correlation ID"
-        required: true
-        type: string
-      trace_id:
-        description: "ZeroUI trace ID"
-        required: true
-        type: string
-      target_workflow_run_id:
-        description: "Exact cancelled target workflow run ID"
-        required: true
-        type: string
-      target_workflow_run_attempt:
-        description: "Exact cancelled target workflow run attempt"
-        required: true
-        type: string
-      target_workflow_path:
-        description: "Exact cancelled target workflow path"
-        required: true
-        type: string
-      target_commit_sha:
-        description: "Exact generated commit SHA"
-        required: true
-        type: string
-      target_branch:
-        description: "Simulator branch"
-        required: true
-        type: string
+  push:
+    branches:
+      - "zeroui-trigger-simulator/workspace/0d5770c03205"
+    paths:
+      - ".zeroui-simulator/ci/current/er056/detector-trigger.json"
 
 permissions:
   contents: read
@@ -48,13 +23,6 @@ jobs:
 
       - name: Build workflow-cancelled evidence
         shell: bash
-        env:
-          TARGET_WORKFLOW_RUN_ID: ${{ inputs.target_workflow_run_id }}
-          TARGET_WORKFLOW_RUN_ATTEMPT: ${{ inputs.target_workflow_run_attempt }}
-          TARGET_WORKFLOW_PATH: ${{ inputs.target_workflow_path }}
-          TARGET_COMMIT_SHA: ${{ inputs.target_commit_sha }}
-          TARGET_BRANCH: ${{ inputs.target_branch }}
-          TARGET_REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           python3 .zeroui-simulator/ci/current/er056/tools/build_workflow_cancelled_evidence.py
