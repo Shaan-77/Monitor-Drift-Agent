@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zeroui-uat-gpl-demo"
+version = "0.1.0"
+description = "ZeroUI ER-054 simulator GPL fixture package"
+license = { text = "GPL-3.0-only" }
+requires-python = ">=3.10"

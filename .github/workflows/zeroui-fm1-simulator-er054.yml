@@ -1,0 +1,55 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-054 Simulator
+
+on:
+  push:
+    paths:
+      - ".github/workflows/zeroui-fm1-simulator-er054.yml"
+      - ".zeroui-simulator/ci/current/er054/**"
+      - ".zeroui-simulator/ci/current/scenario.json"
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er054-license-policy:
+    name: ZeroUI FM-1 ER-054 Simulator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare license scan environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "${ runner.temp }/er054-venv"
+          source "${ runner.temp }/er054-venv/bin/activate"
+          python -m pip install --upgrade pip
+          python -m pip install pip-licenses
+          python -m pip install ./.zeroui-simulator/ci/current/er054/fixture/gpl_demo_package
+
+      - name: Scan installed package licenses
+        shell: bash
+        run: |
+          set -euo pipefail
+          source "${ runner.temp }/er054-venv/bin/activate"
+          cd .zeroui-simulator/ci/current/er054/fixture
+          pip-licenses --format=json --output-file pip-licenses.json
+
+      - name: Build license evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .zeroui-simulator/ci/current/er054/fixture
+          python3 ../tools/build_license_evidence.py pip-licenses.json
+
+      - name: ZeroUI governance gate
+        uses: ./.zeroui-simulator/ci/current/er054/action
+        with:
+          evidence_file: .zeroui-simulator/ci/current/er054/fixture/license-evidence.json
+          evidence_format: license-evidence
+          job_id: zeroui-fm1-er054-license-policy
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}
