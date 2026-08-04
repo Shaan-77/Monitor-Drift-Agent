@@ -1,0 +1,6 @@
+{
+  "consumer": "order-service",
+  "provider": "customer-service",
+  "interaction": "GET /customers/{id}",
+  "required_response_fields": ["id", "email", "status"]
+}

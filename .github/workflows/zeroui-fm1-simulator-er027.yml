@@ -1,0 +1,36 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-027 Simulator
+
+on:
+  push:
+    paths:
+      - ".github/workflows/zeroui-fm1-simulator-er027.yml"
+      - ".zeroui-simulator/ci/current/er027/**"
+      - ".zeroui-simulator/ci/current/scenario.json"
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er027-contract-verification:
+    name: ZeroUI FM-1 ER-027 Simulator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify customer contract compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .zeroui-simulator/ci/current/er027/tools/verify_customer_contract.py
+
+      - name: ZeroUI governance gate
+        uses: ./.zeroui-simulator/ci/current/er027/action
+        with:
+          evidence_file: contract-verification-evidence.json
+          evidence_format: policy-gate-evidence
+          job_id: zeroui-fm1-er027-contract-verification
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}
