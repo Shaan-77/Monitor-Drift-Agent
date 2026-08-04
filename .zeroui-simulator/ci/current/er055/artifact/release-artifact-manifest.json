@@ -1,0 +1,10 @@
+{
+  "artifact_name": "zeroui-er055-simulator-artifact",
+  "artifact_ref": "ghcr.io/zeroui/er055-simulator:0.1.0",
+  "artifact_version": "0.1.0",
+  "expected_format": "SPDX",
+  "expected_sbom_path": ".zeroui-simulator/ci/current/er055/artifact/sbom.spdx.json",
+  "release_bound": true,
+  "sbom_required": true,
+  "scenario": "missing_sbom"
+}

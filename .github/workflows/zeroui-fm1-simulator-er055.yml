@@ -1,0 +1,35 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-055 Simulator
+
+on:
+  push:
+    paths:
+      - ".github/workflows/zeroui-fm1-simulator-er055.yml"
+      - ".zeroui-simulator/ci/current/er055/**"
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er055-sbom-gate:
+    name: ZeroUI FM-1 ER-055 Simulator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build SBOM presence evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .zeroui-simulator/ci/current/er055/tools/build_sbom_evidence.py
+
+      - name: ZeroUI governance gate
+        uses: ./.zeroui-simulator/ci/current/er055/action
+        with:
+          evidence_file: .zeroui-simulator/ci/current/er055/artifact/sbom-evidence.json
+          evidence_format: sbom-presence
+          job_id: zeroui-fm1-er055-sbom-gate
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}

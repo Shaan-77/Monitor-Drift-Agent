@@ -1,0 +1,13 @@
+{
+  "branch": "zeroui-trigger-simulator/workspace/0d5770c03205",
+  "created_at": "2026-08-04T16:32:31.234184+00:00",
+  "event_type_id": "ci.sbom.missing",
+  "pre_trigger_head_sha": "060c7f7319303e4fb04947b5d715b9efbcb5c64f",
+  "pull_request_number": 46,
+  "recipe_id": "ci-015",
+  "repository": "Shaan-77/Monitor-Drift-Agent",
+  "scenario": "block",
+  "simulator_run_id": "run-f41b0f7d07bd46a19a3a80969217ab64",
+  "trace_id": "tsim-run-f41b0f7d07bd46a19a3a80969217ab64",
+  "workflow_name": "ZeroUI FM-1 ER-055 Simulator"
+}
