@@ -13,6 +13,10 @@ SCENARIO_PATH = Path(".zeroui-simulator/ci/current/er054/scenario.json")
 EXPECTED_ER = "ER-054"
 
 
+def build_github_actions_source_event_id(event_type_id, workflow_run_id, github_job_key, run_attempt):
+    return f"gha-{{event_type_id}}-{{workflow_run_id}}-{{github_job_key}}-{{run_attempt}}"
+
+
 def read_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
@@ -323,7 +327,12 @@ def build_payload(event_type_id: str, context: Dict[str, Any]) -> Dict[str, Any]
     job_id = os.getenv("ZEROUI_JOB_ID") or os.getenv("GITHUB_JOB") or "zeroui-governance-gate"
     trace_id = str(scenario.get("trace_id") or f"trace-gha-{event_type_id}-{run_id}-{run_attempt}")
     simulator_run_id = str(scenario.get("simulator_run_id") or "").strip()
-    source_event_id = f"gha-{event_type_id}-{run_id}-{job_id}-{run_attempt}"
+    source_event_id = build_github_actions_source_event_id(
+        event_type_id,
+        run_id,
+        job_id,
+        run_attempt,
+    )
 
     return {
         "schema_version": 1,
@@ -414,11 +423,35 @@ def post_signal(payload: Dict[str, Any]) -> Dict[str, Any]:
         raise SystemExit(1)
 
     try:
-        return json.loads(body)
+        parsed = json.loads(body)
     except Exception as exc:
         print("FM-1 non-JSON response:")
         print(body)
         raise SystemExit(f"FM-1 response was not JSON: {exc}") from exc
+
+    normalized_event_id = pick(
+        parsed,
+        "normalized_event_id",
+        "projections.ci_response.normalized_event_id",
+    )
+    reason_code = pick(parsed, "reason_code", "projections.ci_response.reason_code")
+    mapped_trigger_id = pick(
+        parsed,
+        "mapped_trigger_id",
+        "trigger_id",
+        "projections.ci_response.mapped_trigger_id",
+    )
+    decision_outcome = pick(
+        parsed,
+        "decision_outcome",
+        "decision.decision_outcome",
+        "projections.ci_response.decision_outcome",
+    )
+    print(f"normalized_event_id={normalized_event_id or 'n/a'}")
+    print(f"reason_code={reason_code or 'n/a'}")
+    print(f"mapped_trigger_id={mapped_trigger_id or 'n/a'}")
+    print(f"decision_outcome={decision_outcome or 'n/a'}")
+    return parsed
 
 
 def pick(response: Dict[str, Any], *paths: str) -> Any:
@@ -479,6 +512,8 @@ def enforce_response(response: Dict[str, Any]) -> None:
         "Receipt status": receipt_status or "n/a",
         "Receipt present": receipt_present,
         "Active blocker count": blocker_count,
+        "Normalized event ID": pick(response, "normalized_event_id", "projections.ci_response.normalized_event_id") or "n/a",
+        "Reason code": pick(response, "reason_code", "projections.ci_response.reason_code") or "n/a",
     }
 
     if str(er or "").strip().upper() != EXPECTED_ER:
