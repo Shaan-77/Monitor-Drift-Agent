@@ -23,6 +23,8 @@ jobs:
 
       - name: Build workflow-cancelled evidence
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           python3 .zeroui-simulator/ci/current/er056/tools/build_workflow_cancelled_evidence.py

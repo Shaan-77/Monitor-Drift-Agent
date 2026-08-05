@@ -33,9 +33,16 @@ def trigger_required(name: str, trigger: dict) -> str:
 
 def fetch_workflow_run(run_id: str) -> dict:
     token = str(os.getenv("GITHUB_TOKEN") or "").strip()
+    repository = str(os.getenv("GITHUB_REPOSITORY") or "").strip()
+    endpoint_path = (
+        f"/repos/{repository}/actions/runs/{run_id}" if repository else f"/actions/runs/{run_id}"
+    )
+    print(f"github_token_present={'YES' if token else 'NO'}")
+    print(f"github_repository_present={'YES' if repository else 'NO'}")
+    print(f"target_run_id={run_id}")
+    print(f"requested_api_endpoint={endpoint_path}")
     if not token:
         raise SystemExit("GITHUB_TOKEN is required")
-    repository = str(os.getenv("GITHUB_REPOSITORY") or "").strip()
     if not repository:
         raise SystemExit("GITHUB_REPOSITORY is required")
     url = f"https://api.github.com/repos/{repository}/actions/runs/{run_id}"
@@ -51,6 +58,7 @@ def fetch_workflow_run(run_id: str) -> dict:
         with urllib.request.urlopen(request, timeout=60) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
+        print(f"http_status={exc.code}")
         body = exc.read().decode("utf-8", errors="replace")
         raise SystemExit(f"GitHub workflow run fetch failed ({exc.code}): {body}") from exc
     if not isinstance(payload, dict):
