@@ -1,13 +1,19 @@
 {
   "branch": "zeroui-trigger-simulator/workspace/0d5770c03205",
-  "created_at": "2026-08-05T09:00:14.960899+00:00",
+  "context": {
+    "check_family": "required_ci_gate",
+    "required_gate": true,
+    "skip_reason": "required gate skipped",
+    "workflow_family": "required_workflow"
+  },
+  "created_at": "2026-08-05T09:52:15.843581+00:00",
   "event_type_id": "ci.workflow.skipped",
-  "pre_trigger_head_sha": "37d2bed31b11e6cc635587604cd00d853bed130a",
+  "pre_trigger_head_sha": "331971758336eb94a390de2561cdd5477f0acd0b",
   "pull_request_number": 46,
   "recipe_id": "ci-004",
   "repository": "Shaan-77/Monitor-Drift-Agent",
   "scenario": "block",
-  "simulator_run_id": "run-539eb192d3fe4d5296e7afd6f547b22a",
-  "trace_id": "tsim-run-539eb192d3fe4d5296e7afd6f547b22a",
+  "simulator_run_id": "run-b6ad7166b017485a9008f619862e5c1e",
+  "trace_id": "tsim-run-b6ad7166b017485a9008f619862e5c1e",
   "workflow_name": "ZeroUI FM-1 ER-069 Workflow Skipped"
 }

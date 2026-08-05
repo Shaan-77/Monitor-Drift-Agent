@@ -74,10 +74,11 @@ def build_workflow_skipped_evidence(
     target_repository: str,
 ) -> dict[str, Any]:
     validate_target_job_completed_skipped(target_job)
-    return {
+    evidence = {
         "event_type_id": EVENT_TYPE_ID,
         "required_gate": True,
-        "workflow_family": "release_as_code",
+        "workflow_family": "required_workflow",
+        "check_family": "required_ci_gate",
         "stage": "release",
         "workflow_completed": False,
         "workflow_skipped": True,
@@ -85,6 +86,7 @@ def build_workflow_skipped_evidence(
         "workflow_cancelled": False,
         "workflow_conclusion": "skipped",
         "scan_passed": False,
+        "skip_reason": "required gate skipped",
         "skip_kind": "required_release_condition_not_met",
         "reason": "required_workflow_skipped",
         "target_workflow_name": workflow_name,
@@ -102,6 +104,9 @@ def build_workflow_skipped_evidence(
         "target_job_status": "completed",
         "target_job_html_url": str(target_job.get("html_url") or ""),
     }
+    if evidence["workflow_family"] == "release_as_code":
+        raise SystemExit("ER069_ROUTING_CONTEXT_INVALID")
+    return evidence
 
 
 def fetch_workflow_jobs(run_id: str) -> list[dict[str, Any]]:

@@ -13,6 +13,11 @@ SCENARIO_PATH = Path(".zeroui-simulator/ci/current/er069/scenario.json")
 EXPECTED_ER = "ER-069"
 TARGET_JOB_DISPLAY_NAME = "ZeroUI FM-1 ER-069 Required Release Workflow"
 WORKFLOW_PATH = ".github/workflows/zeroui-fm1-simulator-er069.yml"
+WORKFLOW_FAMILY = "required_workflow"
+CHECK_FAMILY = "required_ci_gate"
+SKIP_REASON = "required gate skipped"
+ROUTING_REASON = "required_workflow_skipped"
+SKIP_KIND = "required_release_condition_not_met"
 
 
 def build_github_actions_source_event_id(event_type_id, workflow_run_id, github_job_key, run_attempt):
@@ -29,12 +34,14 @@ def github_workflow_skipped_context(evidence: Any) -> Dict[str, Any]:
     required_keys = [
         "required_gate",
         "workflow_family",
+        "check_family",
         "stage",
         "workflow_skipped",
         "workflow_failed",
         "workflow_conclusion",
         "workflow_cancelled",
         "scan_passed",
+        "skip_reason",
         "skip_kind",
         "reason",
         "target_workflow_path",
@@ -55,8 +62,14 @@ def github_workflow_skipped_context(evidence: Any) -> Dict[str, Any]:
 
     if not isinstance(data["required_gate"], bool) or data["required_gate"] is not True:
         raise SystemExit("required_gate must be true")
-    if str(data["workflow_family"]) != "release_as_code":
-        raise SystemExit("workflow_family must be release_as_code")
+    if str(data["workflow_family"]) == "release_as_code":
+        raise SystemExit("ER069_ROUTING_CONTEXT_INVALID")
+    if str(data["workflow_family"]) != WORKFLOW_FAMILY:
+        raise SystemExit("workflow_family must be required_workflow")
+    if str(data["check_family"]) != CHECK_FAMILY:
+        raise SystemExit("check_family must be required_ci_gate")
+    if str(data["skip_reason"]) != SKIP_REASON:
+        raise SystemExit("skip_reason must be required gate skipped")
     if str(data["stage"]) != "release":
         raise SystemExit("stage must be release")
     if not isinstance(data["workflow_skipped"], bool) or data["workflow_skipped"] is not True:
@@ -69,9 +82,9 @@ def github_workflow_skipped_context(evidence: Any) -> Dict[str, Any]:
         raise SystemExit("workflow_cancelled must be false")
     if not isinstance(data["scan_passed"], bool) or data["scan_passed"] is not False:
         raise SystemExit("scan_passed must be false")
-    if str(data["skip_kind"]) != "required_release_condition_not_met":
+    if str(data["skip_kind"]) != SKIP_KIND:
         raise SystemExit("skip_kind must be required_release_condition_not_met")
-    if str(data["reason"]) != "required_workflow_skipped":
+    if str(data["reason"]) != ROUTING_REASON:
         raise SystemExit("reason must be required_workflow_skipped")
     if str(data["target_workflow_path"]) != WORKFLOW_PATH:
         raise SystemExit("target_workflow_path must match the managed ER-069 workflow")
@@ -91,7 +104,8 @@ def github_workflow_skipped_context(evidence: Any) -> Dict[str, Any]:
 
     return {
         "required_gate": True,
-        "workflow_family": "release_as_code",
+        "workflow_family": WORKFLOW_FAMILY,
+        "check_family": CHECK_FAMILY,
         "stage": "release",
         "workflow_completed": False,
         "workflow_skipped": True,
@@ -99,8 +113,9 @@ def github_workflow_skipped_context(evidence: Any) -> Dict[str, Any]:
         "workflow_cancelled": False,
         "workflow_conclusion": "skipped",
         "scan_passed": False,
-        "skip_kind": "required_release_condition_not_met",
-        "reason": "required_workflow_skipped",
+        "skip_reason": SKIP_REASON,
+        "skip_kind": SKIP_KIND,
+        "reason": ROUTING_REASON,
         "target_workflow_name": str(data.get("target_workflow_name") or ""),
         "target_workflow_path": str(data["target_workflow_path"]),
         "target_workflow_run_id": target_run_id,
@@ -116,6 +131,24 @@ def github_workflow_skipped_context(evidence: Any) -> Dict[str, Any]:
         "target_job_status": "completed",
         "target_job_html_url": str(data.get("target_job_html_url") or ""),
     }
+
+
+def validate_er069_routing_context_before_post(event_type_id: str, context: Dict[str, Any]) -> None:
+    if event_type_id != "ci.workflow.skipped":
+        raise SystemExit("ER069_ROUTING_CONTEXT_INVALID")
+    if str(context.get("workflow_family") or "") == "release_as_code":
+        print("ER-069 required-workflow-skipped evidence cannot use the release_as_code routing family because that family belongs to ER-006.")
+        raise SystemExit("ER069_ROUTING_CONTEXT_INVALID")
+    if context.get("required_gate") is not True:
+        raise SystemExit("ER069_ROUTING_CONTEXT_INVALID")
+    if str(context.get("workflow_family") or "") != WORKFLOW_FAMILY:
+        raise SystemExit("ER069_ROUTING_CONTEXT_INVALID")
+    if context.get("workflow_skipped") is not True:
+        raise SystemExit("ER069_ROUTING_CONTEXT_INVALID")
+    if str(context.get("workflow_conclusion") or "").strip().lower() != "skipped":
+        raise SystemExit("ER069_ROUTING_CONTEXT_INVALID")
+    if str(context.get("check_family") or "") != CHECK_FAMILY:
+        raise SystemExit("ER069_ROUTING_CONTEXT_INVALID")
 
 
 SUPPORTED_EVENT_BY_FORMAT = {
@@ -378,7 +411,7 @@ def enforce_response(response: Dict[str, Any]) -> None:
 
     if str(er or "").strip().upper() != EXPECTED_ER:
         write_summary("❌ ZeroUI governance check failed.", "Unexpected mapped ER", summary_fields)
-        print(f"::error title=ZeroUI governance check failed::mapped ER must be {EXPECTED_ER}, got {er}.")
+        print(f"::error title=ER069_MAPPED_ER_MISMATCH::mapped ER must be {EXPECTED_ER}, got {er}.")
         raise SystemExit(1)
 
     if policy_source != "DB_POLICY_SOURCE":
@@ -441,9 +474,13 @@ def main() -> None:
         raise SystemExit(f"Evidence file not found: {evidence_file}")
 
     event_type_id, context = context_from_evidence(evidence_file, evidence_format)
+    validate_er069_routing_context_before_post(event_type_id, context)
     print("ZeroUI evidence context summary:")
     print(json.dumps({
         "event_type_id": event_type_id,
+        "workflow_family": context.get("workflow_family"),
+        "check_family": context.get("check_family"),
+        "skip_reason": context.get("skip_reason"),
         "workflow_failed": context.get("workflow_failed"),
         "workflow_conclusion": context.get("workflow_conclusion"),
         "target_job_name": context.get("target_job_name"),
