@@ -1,0 +1,58 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-068 Workflow Failure
+
+on:
+  push:
+    branches:
+      - "zeroui-trigger-simulator/workspace/0d5770c03205"
+    paths:
+      - ".github/workflows/zeroui-fm1-simulator-er068.yml"
+      - ".zeroui-simulator/ci/current/er068/**"
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er068-required-release:
+    name: ZeroUI FM-1 ER-068 Required Release Workflow
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run required release workflow check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .zeroui-simulator/ci/current/er068/fixture/er068_required_release_workflow_check.py
+
+  zeroui-fm1-er068-reporter:
+    name: ZeroUI FM-1 ER-068 Failure Reporter
+    needs: zeroui-fm1-er068-required-release
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build workflow failure evidence
+        shell: bash
+        env:
+          REQUIRED_WORKFLOW_RESULT: ${{ needs.zeroui-fm1-er068-required-release.result }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 .zeroui-simulator/ci/current/er068/tools/build_workflow_failure_evidence.py
+
+      - name: ZeroUI governance gate
+        uses: ./.zeroui-simulator/ci/current/er068/action
+        with:
+          evidence_file: .zeroui-simulator/ci/current/er068/artifact/workflow-failure-evidence.json
+          evidence_format: github-workflow-failure
+          job_id: zeroui-fm1-er068-reporter
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}

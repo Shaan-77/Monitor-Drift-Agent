@@ -1,0 +1,13 @@
+{
+  "branch": "zeroui-trigger-simulator/workspace/0d5770c03205",
+  "created_at": "2026-08-05T08:07:46.787666+00:00",
+  "event_type_id": "ci.workflow.failed",
+  "pre_trigger_head_sha": "c405140dfaa9bceb8b6919d5bd87f066692f6375",
+  "pull_request_number": 46,
+  "recipe_id": "ci-002",
+  "repository": "Shaan-77/Monitor-Drift-Agent",
+  "scenario": "block",
+  "simulator_run_id": "run-884f7d73c665482783ec152890b63e9f",
+  "trace_id": "tsim-run-884f7d73c665482783ec152890b63e9f",
+  "workflow_name": "ZeroUI FM-1 ER-068 Workflow Failure"
+}
