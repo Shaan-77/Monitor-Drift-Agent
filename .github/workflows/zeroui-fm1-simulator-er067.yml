@@ -1,0 +1,54 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-067 Test Failure
+
+on:
+  push:
+    branches:
+      - "zeroui-trigger-simulator/workspace/0d5770c03205"
+    paths:
+      - ".github/workflows/zeroui-fm1-simulator-er067.yml"
+      - ".zeroui-simulator/ci/current/er067/**"
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er067-test-failure:
+    name: ZeroUI FM-1 ER-067 Test Failure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run controlled pytest failure
+        shell: bash
+        run: |
+          set -euo pipefail
+          ER067_VENV="${RUNNER_TEMP}/er067-venv"
+          python3 -m venv "$ER067_VENV"
+          source "$ER067_VENV/bin/activate"
+          python -m pip install --upgrade pip
+          python -m pip install pytest
+          mkdir -p .zeroui-simulator/ci/current/er067/artifact
+          set +e
+          pytest .zeroui-simulator/ci/current/er067/fixture/test_er067_failure.py --junitxml=.zeroui-simulator/ci/current/er067/artifact/pytest-results.xml -v
+          PYTEST_EXIT_CODE=$?
+          set -e
+          echo "PYTEST_EXIT_CODE=$PYTEST_EXIT_CODE" >> "$GITHUB_ENV"
+          echo "pytest_exit_code=$PYTEST_EXIT_CODE"
+
+      - name: Validate pytest junit evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .zeroui-simulator/ci/current/er067/tools/validate_pytest_junit.py .zeroui-simulator/ci/current/er067/artifact/pytest-results.xml
+
+      - name: ZeroUI governance gate
+        uses: ./.zeroui-simulator/ci/current/er067/action
+        with:
+          evidence_file: .zeroui-simulator/ci/current/er067/artifact/pytest-results.xml
+          evidence_format: pytest-junit
+          job_id: zeroui-fm1-er067-test-failure
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}
