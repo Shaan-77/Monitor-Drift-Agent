@@ -1,12 +1,12 @@
 {
-  "cancellation_verified_at": "2026-08-04T19:03:43.741358+00:00",
-  "simulator_run_id": "run-6c01d5dcd5a94295bda0e94b0928c047",
+  "cancellation_verified_at": "2026-08-05T04:01:32.772667+00:00",
+  "simulator_run_id": "run-dc45b1ca99074ced93f54ecb66985b22",
   "target_branch": "zeroui-trigger-simulator/workspace/0d5770c03205",
-  "target_commit_sha": "852febc10691bb581a57f12a4624e52477867610",
+  "target_commit_sha": "d7f185f9b9e3adff71ca13faa20d1a36eaba64fc",
   "target_conclusion": "cancelled",
-  "target_workflow_name": "ZeroUI ER-056 Required Gate 852febc10691bb581a57f12a4624e52477867610",
+  "target_workflow_name": "ZeroUI ER-056 Required Gate d7f185f9b9e3adff71ca13faa20d1a36eaba64fc",
   "target_workflow_path": ".github/workflows/zeroui-fm1-simulator-er056-required-gate.yml",
   "target_workflow_run_attempt": 1,
-  "target_workflow_run_id": 30941518874,
-  "trace_id": "tsim-run-6c01d5dcd5a94295bda0e94b0928c047"
+  "target_workflow_run_id": 30973922653,
+  "trace_id": "tsim-run-dc45b1ca99074ced93f54ecb66985b22"
 }
