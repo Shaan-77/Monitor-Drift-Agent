@@ -1,0 +1,64 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-057 Promotion Gate
+run-name: ZeroUI ER-057 Promotion Gate ${{ github.sha }}
+
+on:
+  push:
+    branches:
+      - "zeroui-trigger-simulator/workspace/0d5770c03205"
+    paths:
+      - ".github/workflows/zeroui-fm1-simulator-er057-promotion-gate.yml"
+      - ".zeroui-simulator/ci/current/er057/promotion-trigger.json"
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er057-promotion-request:
+    name: ZeroUI FM-1 ER-057 Promotion Request
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify ER-057 promotion trigger correlation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          trigger_path = Path(".zeroui-simulator/ci/current/er057/promotion-trigger.json")
+          scenario_path = Path(".zeroui-simulator/ci/current/er057/scenario.json")
+          if not trigger_path.is_file():
+              print(f"Missing promotion trigger file: {trigger_path}", file=sys.stderr)
+              raise SystemExit(2)
+          if not scenario_path.is_file():
+              print(f"Missing scenario file: {scenario_path}", file=sys.stderr)
+              raise SystemExit(2)
+          trigger = json.loads(trigger_path.read_text(encoding="utf-8"))
+          scenario = json.loads(scenario_path.read_text(encoding="utf-8"))
+          if str(trigger.get("simulator_run_id") or "") != str(scenario.get("simulator_run_id") or ""):
+              print("promotion-trigger simulator_run_id mismatch", file=sys.stderr)
+              raise SystemExit(2)
+          if str(trigger.get("expected_branch") or "") != "zeroui-trigger-simulator/workspace/0d5770c03205":
+              print("promotion-trigger expected_branch mismatch", file=sys.stderr)
+              raise SystemExit(2)
+          if str(trigger.get("expected_workflow_path") or "") != ".github/workflows/zeroui-fm1-simulator-er057-promotion-gate.yml":
+              print("promotion-trigger expected_workflow_path mismatch", file=sys.stderr)
+              raise SystemExit(2)
+          if str(trigger.get("target_environment") or "") != "dev":
+              print("promotion-trigger target_environment mismatch", file=sys.stderr)
+              raise SystemExit(2)
+          PY
+
+      - name: Promotion approved and executing
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "GitHub Environment promotion was approved."
+          echo "Target environment: dev"
+          echo "This step should not execute in ER-057 blocker-only rejection scenario."

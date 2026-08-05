@@ -1,0 +1,14 @@
+{
+  "branch": "zeroui-trigger-simulator/workspace/0d5770c03205",
+  "created_at": "2026-08-05T05:09:26.269405+00:00",
+  "event_type_id": "ci.promotion.rejected",
+  "pre_trigger_head_sha": "48c759c922dff7137ac22572020c9d89e957ed91",
+  "pull_request_number": 46,
+  "recipe_id": "ci-024",
+  "repository": "Shaan-77/Monitor-Drift-Agent",
+  "scenario": "block",
+  "simulator_run_id": "run-6b65a4ea3d3b479d827d0b8836e66fc2",
+  "target_environment": "dev",
+  "trace_id": "tsim-run-6b65a4ea3d3b479d827d0b8836e66fc2",
+  "workflow_name": "ZeroUI FM-1 ER-057 Detector"
+}
