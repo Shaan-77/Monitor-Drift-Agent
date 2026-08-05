@@ -1,0 +1,54 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-069 Workflow Skipped
+
+on:
+  push:
+    branches:
+      - "zeroui-trigger-simulator/workspace/0d5770c03205"
+    paths:
+      - ".github/workflows/zeroui-fm1-simulator-er069.yml"
+      - ".zeroui-simulator/ci/current/er069/**"
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er069-required-release:
+    name: ZeroUI FM-1 ER-069 Required Release Workflow
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Unreachable required release step
+        shell: bash
+        run: echo "This step must never run for ER-069."
+
+  zeroui-fm1-er069-reporter:
+    name: ZeroUI FM-1 ER-069 Skipped Reporter
+    needs: zeroui-fm1-er069-required-release
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build workflow skipped evidence
+        shell: bash
+        env:
+          REQUIRED_WORKFLOW_RESULT: ${{ needs.zeroui-fm1-er069-required-release.result }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 .zeroui-simulator/ci/current/er069/tools/build_workflow_skipped_evidence.py
+
+      - name: ZeroUI governance gate
+        uses: ./.zeroui-simulator/ci/current/er069/action
+        with:
+          evidence_file: .zeroui-simulator/ci/current/er069/artifact/workflow-skipped-evidence.json
+          evidence_format: github-workflow-skipped
+          job_id: zeroui-fm1-er069-reporter
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}
