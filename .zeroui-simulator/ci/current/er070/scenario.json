@@ -1,0 +1,20 @@
+{
+  "branch": "zeroui-trigger-simulator/workspace/0d5770c03205",
+  "context": {
+    "artifact_ref": "python_wheel:monitor-drift-agent:0.1.0",
+    "artifact_type": "python_wheel",
+    "build_family": "artifact_build",
+    "check_family": "artifact_build",
+    "required_gate": true
+  },
+  "created_at": "2026-08-05T11:00:19.974149+00:00",
+  "event_type_id": "ci.artifact.build_failed",
+  "pre_trigger_head_sha": "f8d023bc9217f61cc94851e279a47e1c8f95be97",
+  "pull_request_number": 46,
+  "recipe_id": "ci-017",
+  "repository": "Shaan-77/Monitor-Drift-Agent",
+  "scenario": "block",
+  "simulator_run_id": "run-9e0eab8b4bbc41d1afcebfc2cfecc3a2",
+  "trace_id": "tsim-run-9e0eab8b4bbc41d1afcebfc2cfecc3a2",
+  "workflow_name": "ZeroUI FM-1 ER-070 Artifact Build Failure"
+}

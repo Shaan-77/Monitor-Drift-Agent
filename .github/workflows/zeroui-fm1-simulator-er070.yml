@@ -1,0 +1,73 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-070 Artifact Build Failure
+
+on:
+  push:
+    branches:
+      - "zeroui-trigger-simulator/workspace/0d5770c03205"
+    paths:
+      - ".github/workflows/zeroui-fm1-simulator-er070.yml"
+      - ".zeroui-simulator/ci/current/er070/**"
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er070-artifact-build:
+    name: ZeroUI FM-1 ER-070 Artifact Build Failure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare isolated build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          ER070_VENV="${RUNNER_TEMP}/er070-venv"
+          if ! python3 -m venv "$ER070_VENV"; then
+            echo "ER070_BUILD_TOOL_SETUP_FAILED"
+            exit 1
+          fi
+          source "$ER070_VENV/bin/activate"
+          if ! python -m pip install --upgrade pip; then
+            echo "ER070_BUILD_TOOL_SETUP_FAILED"
+            exit 1
+          fi
+          if ! python -m pip install build setuptools; then
+            echo "ER070_BUILD_TOOL_SETUP_FAILED"
+            exit 1
+          fi
+
+      - name: Run controlled artifact build failure
+        shell: bash
+        run: |
+          set -euo pipefail
+          ER070_VENV="${RUNNER_TEMP}/er070-venv"
+          source "$ER070_VENV/bin/activate"
+          mkdir -p .zeroui-simulator/ci/current/er070/artifact
+          set +e
+          python3 .zeroui-simulator/ci/current/er070/tools/run_artifact_build.py
+          BUILD_SCRIPT_EXIT_CODE=$?
+          set -e
+          echo "BUILD_SCRIPT_EXIT_CODE=$BUILD_SCRIPT_EXIT_CODE" >> "$GITHUB_ENV"
+          if [ "$BUILD_SCRIPT_EXIT_CODE" -ne 0 ]; then
+            echo "ER-070 build script failed before evidence emission (exit=$BUILD_SCRIPT_EXIT_CODE)."
+            exit "$BUILD_SCRIPT_EXIT_CODE"
+          fi
+
+      - name: Validate artifact build evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .zeroui-simulator/ci/current/er070/tools/validate_artifact_build_evidence.py
+
+      - name: ZeroUI governance gate
+        uses: ./.zeroui-simulator/ci/current/er070/action
+        with:
+          evidence_file: .zeroui-simulator/ci/current/er070/artifact/artifact-build-evidence.json
+          evidence_format: github-artifact-build-failure
+          job_id: zeroui-fm1-er070-artifact-build
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}
