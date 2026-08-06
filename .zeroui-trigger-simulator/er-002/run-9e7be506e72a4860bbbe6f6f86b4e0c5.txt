@@ -1,0 +1,4 @@
+TEST-ONLY FM-1 TRIGGER SIMULATION
+run_id=run-9e7be506e72a4860bbbe6f6f86b4e0c5
+created_at=2026-08-06T05:57:01.331619+00:00
+harmless simulator marker file
