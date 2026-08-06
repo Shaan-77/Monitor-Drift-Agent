@@ -1,0 +1,91 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-007 Simulator
+
+on:
+  push:
+    paths:
+      - ".github/workflows/zeroui-fm1-simulator-er007.yml"
+      - ".zeroui-simulator/ci/current/er007/**"
+      - ".zeroui-simulator/ci/current/scenario.json"
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er007-db-migration-check:
+    name: ZeroUI FM-1 ER-007 Simulator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate DB migrations and generate evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          migration_dir = Path(".zeroui-simulator/ci/current/er007/db_migrations")
+          patterns = [
+              ("drop_table", re.compile(r"\bDROP\s+TABLE\b", re.IGNORECASE)),
+              ("drop_column", re.compile(r"\bDROP\s+COLUMN\b", re.IGNORECASE)),
+              ("truncate_table", re.compile(r"\bTRUNCATE\s+TABLE\b", re.IGNORECASE)),
+              ("rename_table", re.compile(r"\bRENAME\s+TO\b", re.IGNORECASE)),
+          ]
+
+          findings = []
+          migration_files = sorted(migration_dir.glob("*.sql")) if migration_dir.exists() else []
+
+          for migration_file in migration_files:
+              text = migration_file.read_text(encoding="utf-8")
+              for line_number, line in enumerate(text.splitlines(), start=1):
+                  for operation, pattern in patterns:
+                      if pattern.search(line):
+                          findings.append({
+                              "file": str(migration_file),
+                              "line": line_number,
+                              "operation": operation,
+                              "message": "Potentially destructive database migration operation detected.",
+                              "statement": line.strip(),
+                          })
+
+          validation_passed = len(findings) == 0
+
+          evidence = {
+              "migration_checker": "zeroui-db-migration-guard",
+              "migration_scope": "app_schema",
+              "migration_files": [str(path) for path in migration_files],
+              "destructive_operation_count": len(findings),
+              "destructive_operation_approved": False,
+              "approval_evidence_present": False,
+              "backup_plan_present": False,
+              "rollback_plan_present": False,
+              "application_dependency_check_passed": False,
+              "migration_window_approved": False,
+              "validation_passed": validation_passed,
+              "scan_passed": validation_passed,
+              "reason": "db_migration_check_passed" if validation_passed else "unsafe_db_migration_detected_without_required_approval_evidence",
+              "findings": findings,
+          }
+
+          with Path("db-migration-evidence.json").open("w", encoding="utf-8") as handle:
+              json.dump(evidence, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+
+          print("ZeroUI ER-007 DB migration evidence:")
+          print(json.dumps(evidence, indent=2, sort_keys=True))
+          PY
+
+      - name: ZeroUI governance gate
+        uses: ./.zeroui-simulator/ci/current/er007/action
+        with:
+          evidence_file: db-migration-evidence.json
+          evidence_format: db-migration-evidence
+          job_id: zeroui-fm1-er007-db-migration-check
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}
