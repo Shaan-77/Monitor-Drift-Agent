@@ -1,0 +1,54 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-051 Simulator
+
+on:
+  push:
+    paths:
+      - ".github/workflows/zeroui-fm1-simulator-er051.yml"
+      - ".zeroui-simulator/ci/current/er051/**"
+      - ".zeroui-simulator/ci/current/scenario.json"
+
+permissions:
+  contents: read
+
+jobs:
+  zeroui-fm1-er051-coverage-drop:
+    name: ZeroUI FM-1 ER-051 Simulator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pytest and coverage tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pytest pytest-cov
+
+      - name: Run partial-coverage unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .zeroui-simulator/ci/current/er051/fixture
+          python3 -m pytest zeroui_uat/test_er051_discount_calculator.py \
+            --cov=zeroui_uat.er051_discount_calculator \
+            --cov-report=json:coverage.json \
+            -v
+
+      - name: Build coverage evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .zeroui-simulator/ci/current/er051/fixture
+          python3 ../tools/build_coverage_evidence.py
+
+      - name: ZeroUI governance gate
+        uses: ./.zeroui-simulator/ci/current/er051/action
+        with:
+          evidence_file: .zeroui-simulator/ci/current/er051/fixture/coverage-evidence.json
+          evidence_format: coverage-evidence
+          job_id: zeroui-fm1-er051-coverage-drop
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}
