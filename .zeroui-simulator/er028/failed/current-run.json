@@ -1,0 +1,14 @@
+{
+  "check_conclusion": "failure",
+  "check_name": "ZeroUI Trigger Simulator / ER-068 / required-workflow-failed",
+  "created_at": "2026-08-06T09:01:54.188635+00:00",
+  "expected_canonical_event": "pr.check.failed",
+  "marker_variant": "failed",
+  "protected_or_release_path": true,
+  "recipe_id": "repo-021",
+  "represents_required_workflow": true,
+  "required_check": true,
+  "run_id": "run-6c97314b867c486699ab60d4b17f9384",
+  "triggered_at": "2026-08-06T09:01:54.188635+00:00",
+  "workflow_path": ".github/workflows/zeroui-fm1-simulator-er028-failed.yml"
+}
