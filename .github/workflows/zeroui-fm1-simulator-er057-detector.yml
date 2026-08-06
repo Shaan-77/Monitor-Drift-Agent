@@ -1,0 +1,40 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 ER-057 Detector
+run-name: ZeroUI ER-057 Detector ${{ github.sha }}
+
+on:
+  push:
+    branches:
+      - "zeroui-trigger-simulator/workspace/0d5770c03205"
+    paths:
+      - ".zeroui-simulator/ci/current/er057/detector-trigger.json"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  zeroui-fm1-er057-detector:
+    name: ZeroUI FM-1 ER-057 Detector
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build promotion-rejection evidence
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 .zeroui-simulator/ci/current/er057/tools/build_promotion_rejection_evidence.py
+
+      - name: ZeroUI governance gate
+        uses: ./.zeroui-simulator/ci/current/er057/action
+        with:
+          evidence_file: .zeroui-simulator/ci/current/er057/artifact/promotion-rejection-evidence.json
+          evidence_format: github-promotion-rejection
+          job_id: zeroui-fm1-er057-detector
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}
