@@ -1,0 +1,20 @@
+# zeroui-simulator-owned
+name: ZeroUI FM-1 Simulator ER-028 Failed
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".zeroui-simulator/er028/failed/**"
+
+permissions:
+  contents: read
+
+jobs:
+  fm1-er028-failed:
+    name: zeroui-fm1-er028-failed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Intentional FM-1 ER-028 failure
+        run: exit 1
