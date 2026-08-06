@@ -1,0 +1,14 @@
+{
+  "check_conclusion": "skipped",
+  "check_name": "ZeroUI Trigger Simulator / ER-069 / required-workflow-skipped",
+  "created_at": "2026-08-06T06:25:21.768823+00:00",
+  "expected_canonical_event": "pr.check.skipped",
+  "marker_variant": "skipped",
+  "protected_or_release_path": true,
+  "recipe_id": "repo-022",
+  "represents_required_workflow": true,
+  "required_check": true,
+  "run_id": "run-e47030f43dd842259f81d3e0ae3de194",
+  "triggered_at": "2026-08-06T06:25:21.768823+00:00",
+  "workflow_path": ".github/workflows/zeroui-fm1-simulator-er028-skipped.yml"
+}
