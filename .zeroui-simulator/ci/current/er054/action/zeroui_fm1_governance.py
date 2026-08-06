@@ -14,7 +14,11 @@ EXPECTED_ER = "ER-054"
 
 
 def build_github_actions_source_event_id(event_type_id, workflow_run_id, github_job_key, run_attempt):
-    return f"gha-{{event_type_id}}-{{workflow_run_id}}-{{github_job_key}}-{{run_attempt}}"
+    return f"gha-{event_type_id}-{workflow_run_id}-{github_job_key}-{run_attempt}"
+
+
+def build_github_actions_source_event_revision(repository, workflow_ref, commit_sha, branch, simulator_run_id=""):
+    return f"gha-rev-{repository}-{workflow_ref}-{commit_sha}-{branch}-{simulator_run_id or 'no-simulator-run'}"
 
 
 def read_json(path: Path) -> Any:
@@ -327,17 +331,26 @@ def build_payload(event_type_id: str, context: Dict[str, Any]) -> Dict[str, Any]
     job_id = os.getenv("ZEROUI_JOB_ID") or os.getenv("GITHUB_JOB") or "zeroui-governance-gate"
     trace_id = str(scenario.get("trace_id") or f"trace-gha-{event_type_id}-{run_id}-{run_attempt}")
     simulator_run_id = str(scenario.get("simulator_run_id") or "").strip()
+    commit_hash = os.getenv("GITHUB_SHA") or "unknown-commit"
     source_event_id = build_github_actions_source_event_id(
         event_type_id,
         run_id,
         job_id,
         run_attempt,
     )
+    source_event_revision = build_github_actions_source_event_revision(
+        repository,
+        workflow_name,
+        commit_hash,
+        branch,
+        simulator_run_id,
+    )
 
     return {
         "schema_version": 1,
         "trace_id": trace_id,
         "source_event_id": source_event_id,
+        "source_event_revision": source_event_revision,
         "provider": "github_actions",
         "platform": "GitHub Actions",
         "source_system": "ci_cd",
@@ -345,7 +358,7 @@ def build_payload(event_type_id: str, context: Dict[str, Any]) -> Dict[str, Any]
         "event_type_id": event_type_id,
         "repository": repository,
         "branch": branch,
-        "commit_hash": os.getenv("GITHUB_SHA") or "unknown-commit",
+        "commit_hash": commit_hash,
         "workflow_name": workflow_name,
         "workflow_run_id": run_id,
         "pipeline_id": run_id,
