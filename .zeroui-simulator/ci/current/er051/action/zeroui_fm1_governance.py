@@ -66,6 +66,9 @@ def coverage_context(evidence: Any) -> Dict[str, Any]:
     baseline_coverage_percent = float(data.get("baseline_coverage_percent", baseline))
     coverage_drop_percent = float(data.get("coverage_drop_percent", max(0.0, baseline - observed_value)))
 
+    if "quality_gate_release_critical" not in data:
+        raise SystemExit("Missing required evidence field: quality_gate_release_critical")
+
     return {
         "metric_type": metric_type,
         "observed_value": observed_value,
@@ -77,6 +80,7 @@ def coverage_context(evidence: Any) -> Dict[str, Any]:
         "baseline_coverage_percent": baseline_coverage_percent,
         "coverage_drop_percent": coverage_drop_percent,
         "coverage_dropped": bool(data.get("coverage_dropped", True)),
+        "quality_gate_release_critical": bool(data.get("quality_gate_release_critical")),
         "coverage_tool": data.get("coverage_tool", "coverage.py"),
         "coverage_report_format": data.get("coverage_report_format", "coverage-json"),
         "coverage_scope": data.get("coverage_scope", "python_unit_tests"),
@@ -269,12 +273,20 @@ def release_branch(scenario: Dict[str, Any]) -> str:
     return default_branch_from_event() or "main"
 
 
+def base_release_branch(scenario: Dict[str, Any], head_branch: str) -> str:
+    base = str(scenario.get("base_branch") or "").strip()
+    if base:
+        return base
+    return head_branch
+
+
 def build_payload(event_type_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
     scenario = load_scenario_metadata()
     run_id = os.getenv("GITHUB_RUN_ID") or "unknown-run"
     run_attempt = os.getenv("GITHUB_RUN_ATTEMPT") or "1"
     repository = os.getenv("GITHUB_REPOSITORY") or str(scenario.get("repository") or "unknown-repository")
-    branch = release_branch(scenario)
+    head_branch = release_branch(scenario)
+    base_branch = base_release_branch(scenario, head_branch)
     workflow_name = os.getenv("GITHUB_WORKFLOW") or str(scenario.get("workflow_name") or "unknown-workflow")
     job_id = os.getenv("ZEROUI_JOB_ID") or os.getenv("GITHUB_JOB") or "zeroui-governance-gate"
     trace_id = str(scenario.get("trace_id") or f"trace-gha-{event_type_id}-{run_id}-{run_attempt}")
@@ -282,11 +294,12 @@ def build_payload(event_type_id: str, context: Dict[str, Any]) -> Dict[str, Any]
     commit_hash = os.getenv("GITHUB_SHA") or "unknown-commit"
     source_event_id = f"gha-{event_type_id}-{run_id}-{job_id}-{run_attempt}"
     source_event_revision = (
-        f"gha-rev-{repository}-{workflow_name}-{commit_hash}-{branch}-"
+        f"gha-rev-{repository}-{workflow_name}-{commit_hash}-{head_branch}-"
         f"{simulator_run_id or 'no-simulator-run'}"
     )
+    release_key = str(scenario.get("release_key") or "").strip()
 
-    return {
+    envelope: Dict[str, Any] = {
         "schema_version": 1,
         "trace_id": trace_id,
         "source_event_id": source_event_id,
@@ -297,8 +310,9 @@ def build_payload(event_type_id: str, context: Dict[str, Any]) -> Dict[str, Any]
         "signal_method": "pipeline_job",
         "event_type_id": event_type_id,
         "repository": repository,
-        "branch": branch,
+        "branch": head_branch,
         "commit_hash": commit_hash,
+        "commit_sha": commit_hash,
         "workflow_name": workflow_name,
         "workflow_run_id": run_id,
         "pipeline_id": run_id,
@@ -313,12 +327,18 @@ def build_payload(event_type_id: str, context: Dict[str, Any]) -> Dict[str, Any]
             "github_actor": os.getenv("GITHUB_ACTOR"),
             "github_actor_id": os.getenv("GITHUB_ACTOR_ID"),
             "source_branch": os.getenv("GITHUB_REF_NAME"),
-            "release_branch": branch,
+            "head_branch": head_branch,
+            "base_branch": base_branch,
+            "release_branch": head_branch,
             "repository": repository,
             "simulator_run_id": simulator_run_id or None,
             "recipe_id": scenario.get("recipe_id"),
         },
     }
+    if release_key:
+        envelope["release_key"] = release_key
+        envelope["raw_metadata"]["release_key"] = release_key
+    return envelope
 
 
 def attach_recheck_correlation(envelope: Dict[str, Any], scenario: Dict[str, Any]) -> Dict[str, Any]:
@@ -393,6 +413,16 @@ def post_signal(payload: Dict[str, Any]) -> Dict[str, Any]:
     if status < 200 or status >= 300:
         print("FM-1 error response:")
         print(body)
+        try:
+            err_body = json.loads(body)
+            reason_code = err_body.get("reason_code")
+            message = err_body.get("message")
+            if reason_code:
+                print(f"reason_code={reason_code}")
+            if message:
+                print(f"fm1_error_message={message}")
+        except json.JSONDecodeError:
+            pass
         raise SystemExit(1)
 
     try:
