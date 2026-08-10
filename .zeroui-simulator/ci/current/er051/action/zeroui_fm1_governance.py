@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import http.client
 import json
 import os
@@ -10,6 +11,16 @@ from urllib.parse import urlparse
 
 
 SCENARIO_PATH = Path(".zeroui-simulator/ci/current/scenario.json")
+
+
+def validate_er051_runtime_binding(evidence_file: Path) -> Dict[str, str]:
+    commit_sha = str(os.getenv("GITHUB_SHA") or "").strip()
+    if not commit_sha:
+        raise SystemExit(
+            "ER051_RUNTIME_CONTEXT_BINDING_FAILED: missing GITHUB_SHA commit binding before FM-1 submission."
+        )
+    artifact_digest = f"sha256:{hashlib.sha256(evidence_file.read_bytes()).hexdigest()}"
+    return {"commitSha": commit_sha, "artifactDigest": artifact_digest}
 
 
 def read_json(path: Path) -> Any:
@@ -310,6 +321,26 @@ def build_payload(event_type_id: str, context: Dict[str, Any]) -> Dict[str, Any]
     }
 
 
+def attach_recheck_correlation(envelope: Dict[str, Any], scenario: Dict[str, Any]) -> Dict[str, Any]:
+    """Bind CI re-check to original ER-051 blocker; never invent unrelated correlation."""
+    recheck = scenario.get("recheck") if isinstance(scenario.get("recheck"), dict) else {}
+    if not recheck:
+        return envelope
+    out = dict(envelope)
+    nev = str(recheck.get("recheck_of_normalized_event_id") or "").strip()
+    blocker_id = str(recheck.get("recheck_of_blocker_id") or "").strip()
+    if nev:
+        out["recheck_of_normalized_event_id"] = nev
+    if blocker_id:
+        out["recheck_of_blocker_id"] = blocker_id
+    out["recheck_reason"] = str(recheck.get("recheck_reason") or "er051_coverage_remediation_recheck")
+    out["ci_recheck"] = True
+    risk_key = str(recheck.get("risk_equivalence_key") or "").strip()
+    if risk_key:
+        out["risk_equivalence_key"] = risk_key
+    return out
+
+
 def _fm1_signal_connection(base_url: str) -> Tuple[http.client.HTTPConnection, str]:
     parsed = urlparse(base_url)
 
@@ -487,6 +518,10 @@ def main() -> None:
     if not evidence_file.exists():
         raise SystemExit(f"Evidence file not found: {evidence_file}")
 
+    runtime_binding = validate_er051_runtime_binding(evidence_file)
+    print("ZeroUI ER-051 runtime binding:")
+    print(json.dumps(runtime_binding, indent=2, sort_keys=True))
+
     event_type_id, context = context_from_evidence(evidence_file, evidence_format)
     print("ZeroUI evidence context summary:")
     print(json.dumps({
@@ -500,6 +535,16 @@ def main() -> None:
     }, indent=2, sort_keys=True))
 
     payload = build_payload(event_type_id, context)
+    payload = attach_recheck_correlation(payload, load_scenario_metadata())
+    try:
+        tools_dir = Path(__file__).resolve().parents[1] / "tools"
+        if str(tools_dir) not in sys.path:
+            sys.path.insert(0, str(tools_dir))
+        from er051_uat_context import attach_er051_uat_evaluation_to_envelope
+
+        payload = attach_er051_uat_evaluation_to_envelope(payload, load_scenario_metadata())
+    except Exception as exc:
+        print(f"Warning: ER-051 UAT evaluation context not attached: {exc}")
     forbidden = ("tenant_id", "release_id", "expected_er", "expected_decision", "should_block")
     for key in forbidden:
         if key in payload:
@@ -510,6 +555,12 @@ def main() -> None:
     print(f"repository={payload.get('repository')}")
     print(f"branch={payload.get('branch')}")
     print(f"workflow_run_id={payload.get('workflow_run_id')}")
+    if payload.get("recheck_of_normalized_event_id") or payload.get("recheck_of_blocker_id"):
+        print(
+            "recheck_of_normalized_event_id="
+            f"{payload.get('recheck_of_normalized_event_id')}"
+        )
+        print(f"recheck_of_blocker_id={payload.get('recheck_of_blocker_id')}")
 
     response = post_signal(payload)
     enforce_response(response)
