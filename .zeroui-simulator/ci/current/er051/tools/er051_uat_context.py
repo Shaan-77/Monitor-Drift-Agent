@@ -26,8 +26,12 @@ _SIGNED_FIELDS = (
     "repository",
     "tenant_id",
     "recipe_id",
+    "mapped_er_id",
+    "event_type_id",
     "uat_operational_fault",
 )
+ER051_EVENT_TYPE_ID = "ci.coverage.dropped"
+ER051_MAPPED_ER_ID = "ER-051"
 
 
 def _text(value: Any) -> str:
@@ -92,6 +96,8 @@ def build_er051_uat_scenario_evaluation(
         "repository": _text(repository),
         "tenant_id": _text(tenant_id),
         "recipe_id": _text(recipe_id) or ER051_RECIPE_ID,
+        "mapped_er_id": ER051_MAPPED_ER_ID,
+        "event_type_id": ER051_EVENT_TYPE_ID,
     }
     fault = _text(uat_operational_fault)
     if fault:
@@ -149,6 +155,7 @@ def attach_er051_uat_evaluation_to_envelope(
     payload = out.get("payload") if isinstance(out.get("payload"), dict) else {}
     payload = dict(payload)
     payload["er051_uat_scenario_evaluation"] = evaluation
+    payload["ci_cd_uat_scenario_evaluation"] = evaluation
     out["payload"] = payload
     return out
 

@@ -1,13 +1,13 @@
 {
   "baseline_coverage_percent": 80.0,
   "branch": "zeroui-trigger-simulator/workspace/0d5770c03205",
-  "created_at": "2026-08-10T10:28:58.649494+00:00",
+  "created_at": "2026-08-10T11:27:18.530896+00:00",
   "emit_coverage_dropped_event": true,
   "event_type_id": "ci.coverage.dropped",
   "expected_simulation_classification": "human_review_required",
   "fixture_source": "synthetic_seed",
   "governance_path": "live_fm1",
-  "pre_trigger_head_sha": "38f3d7d18eaa787d308a98de4b26e8df82f3213d",
+  "pre_trigger_head_sha": "d4a1283bb4162d630b1e4c16e3330b999092f833",
   "pull_request_number": 53,
   "quality_gate_release_critical": false,
   "recipe_id": "ci-009",
@@ -22,17 +22,17 @@
     "manifest_sha256": "9ecabedd48c593af64d18e48123f9118621d37e1e8c52bd5c994a6b7c82908b7",
     "materialization_strategy": "provider_github_actions",
     "package_dir": "X:\\ZeroUI\\dev\\ide\\er_demo_seed\\ER-051",
-    "run_id": "run-b60514d28ec4457592a63fa96f41f0cf",
+    "run_id": "run-d19130800996496f96ca7f8b99780716",
     "scenario_file_path": "X:\\ZeroUI\\dev\\ide\\er_demo_seed\\ER-051\\scenarios\\warn.json",
     "scenario_id": "warn",
     "scenario_sha256": "41c5e582302f9eff5eaf1c064e42112f9cfc29d4b4c39fbbf1503b33419ad69f",
     "seed_manifest_path": "X:\\ZeroUI\\dev\\ide\\er_demo_seed\\ER-051\\er_seed_manifest.json",
     "seed_root": "X:\\ZeroUI\\dev\\ide\\er_demo_seed",
-    "trace_id": "tsim-run-b60514d28ec4457592a63fa96f41f0cf"
+    "trace_id": "tsim-run-d19130800996496f96ca7f8b99780716"
   },
-  "simulator_run_id": "run-b60514d28ec4457592a63fa96f41f0cf",
+  "simulator_run_id": "run-d19130800996496f96ca7f8b99780716",
   "target_coverage_percent": 75.0,
-  "trace_id": "tsim-run-b60514d28ec4457592a63fa96f41f0cf",
+  "trace_id": "tsim-run-d19130800996496f96ca7f8b99780716",
   "transport_mode": "github_actions_coverage_evidence",
   "workflow_name": "ZeroUI FM-1 ER-051 Simulator"
 }
