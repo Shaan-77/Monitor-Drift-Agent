@@ -525,6 +525,49 @@ def enforce_response(response: Dict[str, Any]) -> None:
         print("ZeroUI governance check passed. Pipeline may continue.")
         return
 
+    if decision == "warn":
+        warn_raw = pick(
+            response,
+            "warn_continuation_allowed",
+            "projections.ci_response.warn_continuation_allowed",
+        )
+        blocked_state = pick(
+            response,
+            "blocked_state",
+            "projections.ci_response.blocked_state",
+        )
+        warn_allowed = warn_raw in {True, "true", "True", 1, "1"}
+        if warn_raw in {False, "false", "False", 0, "0"}:
+            warn_allowed = False
+        not_blocked = str(blocked_state or "not_blocked").strip().lower() in {
+            "",
+            "not_blocked",
+            "none",
+            "null",
+        }
+        if warn_allowed and not_blocked and blocker_count == 0:
+            if cli_exit_code not in (None, 0):
+                write_summary("❌ ZeroUI governance check failed.", "CLI exit code indicates block", summary_fields)
+                print("::error title=ZeroUI governance check failed::FM-1 cli_exit_code requires pipeline failure.")
+                raise SystemExit(1)
+            write_summary(
+                "⚠️ ZeroUI governance issued a warning.",
+                "Pipeline may continue with warning",
+                summary_fields,
+            )
+            print(
+                f"::warning title=ZeroUI governance warning::ZeroUI returned warn for {er}. "
+                f"Receipt written. Active blockers: {blocker_count}."
+            )
+            print("ZeroUI governance warning recorded. Pipeline may continue.")
+            return
+        write_summary("❌ ZeroUI governance blocked this pipeline.", "Warning requires resolution", summary_fields)
+        print(
+            f"::error title=ZeroUI governance blocked::ZeroUI warn for {er} is not continuation-safe. "
+            f"Active blockers: {blocker_count}."
+        )
+        raise SystemExit(1)
+
     if cli_exit_code not in (None, 0):
         write_summary("❌ ZeroUI governance blocked this pipeline.", "CLI exit code indicates block", summary_fields)
         print("::error title=ZeroUI governance blocked::FM-1 cli_exit_code requires pipeline failure.")
