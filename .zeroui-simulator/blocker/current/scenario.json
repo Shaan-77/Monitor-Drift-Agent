@@ -11,7 +11,7 @@
     "repository": "Shaan-77/Monitor-Drift-Agent",
     "scenario_id": "pass",
     "signature": "1df2b5d00b519eb755633db8c58aed22e0d4ffc08c698d935875d9f202f73f97",
-    "signed_at": "2026-08-12T21:36:46.212290+00:00",
+    "signed_at": "2026-08-12T21:36:47.928012+00:00",
     "simulator_run_id": "run-067ffd2bdc75478ab49ba54e06fe9bbf",
     "tenant_id": "T/SHAAN7/001",
     "trace_id": "tsim-run-067ffd2bdc75478ab49ba54e06fe9bbf",
@@ -137,6 +137,7 @@
   "recipe_id": "repo-001-block",
   "repository": "Shaan-77/Monitor-Drift-Agent",
   "scenario_id": "pass",
+  "scenario_marker_storage_commit_sha": "1ffed900ba2240e75f03c2ef0d7dd57321b08695",
   "seed_facts": {
     "artifact_digest": "${runtime.artifactDigest}",
     "assertion_scope": "validator_only",
