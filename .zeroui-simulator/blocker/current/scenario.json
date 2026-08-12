@@ -1,23 +1,23 @@
 {
   "ci_cd_uat_scenario_evaluation": {
-    "commit_sha": "4a81b0eaf43230186ff24b4156e3d6d6c8298604",
+    "commit_sha": "68775e2bdd8e7d57196db21e3550984eea3ecabc",
     "evaluation_context": "uat_scenario",
     "event_type_id": "pr.large_change_set",
     "fixture_source": "synthetic_seed",
     "governance_path": "live_fm1",
     "mapped_er_id": "ER-001",
-    "provider_event_target_sha": "4a81b0eaf43230186ff24b4156e3d6d6c8298604",
+    "provider_event_target_sha": "68775e2bdd8e7d57196db21e3550984eea3ecabc",
     "recipe_id": "repo-001-block",
     "repository": "Shaan-77/Monitor-Drift-Agent",
     "scenario_id": "warn",
-    "signature": "08bfe4dc8242a700d54faa9b571ab24d770edaaae5d1010eb40f952dab38025c",
-    "signed_at": "2026-08-12T23:55:45.722824+00:00",
+    "signature": "df894100a9bd36928c7a9650dd3c2c7d0ef20bc096b374f34a7a7648a6ae54b9",
+    "signed_at": "2026-08-12T23:56:19.516732+00:00",
     "simulator_run_id": "run-4e0555b47d34429fb65076ff6549fd88",
     "tenant_id": "T/SHAAN7/001",
     "trace_id": "tsim-run-4e0555b47d34429fb65076ff6549fd88",
     "validated": false
   },
-  "commit_sha": "4a81b0eaf43230186ff24b4156e3d6d6c8298604",
+  "commit_sha": "68775e2bdd8e7d57196db21e3550984eea3ecabc",
   "er_id": "ER-001",
   "event_type_id": "pr.large_change_set",
   "expected_result": {
@@ -137,11 +137,10 @@
     "warning_non_blocking": true
   },
   "mapped_er_id": "ER-001",
-  "provider_event_target_sha": "4a81b0eaf43230186ff24b4156e3d6d6c8298604",
+  "provider_event_target_sha": "68775e2bdd8e7d57196db21e3550984eea3ecabc",
   "recipe_id": "repo-001-block",
   "repository": "Shaan-77/Monitor-Drift-Agent",
   "scenario_id": "warn",
-  "scenario_marker_storage_commit_sha": "3371acf5c7892154638c85b9d88f8ac835512b61",
   "seed_facts": {
     "artifact_digest": "${runtime.artifactDigest}",
     "assertion_scope": "validator_only",
