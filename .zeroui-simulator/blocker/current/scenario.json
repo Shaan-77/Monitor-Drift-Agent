@@ -1,23 +1,23 @@
 {
   "ci_cd_uat_scenario_evaluation": {
-    "commit_sha": "e508953187bd724400e6c03e720b9e6946b51fef",
+    "commit_sha": "4f97b9da8ada9872516d737d5e259258d298fb3e",
     "evaluation_context": "uat_scenario",
     "event_type_id": "pr.large_change_set",
     "fixture_source": "synthetic_seed",
     "governance_path": "live_fm1",
     "mapped_er_id": "ER-001",
-    "provider_event_target_sha": "e508953187bd724400e6c03e720b9e6946b51fef",
+    "provider_event_target_sha": "4f97b9da8ada9872516d737d5e259258d298fb3e",
     "recipe_id": "repo-001-block",
     "repository": "Shaan-77/Monitor-Drift-Agent",
-    "scenario_id": "pass",
-    "signature": "1df2b5d00b519eb755633db8c58aed22e0d4ffc08c698d935875d9f202f73f97",
-    "signed_at": "2026-08-12T21:36:47.928012+00:00",
-    "simulator_run_id": "run-067ffd2bdc75478ab49ba54e06fe9bbf",
+    "scenario_id": "block",
+    "signature": "de7393f5939764a655375dbf0508154125ea8131e5a8d10a4c844b3d9489b801",
+    "signed_at": "2026-08-12T21:46:21.389785+00:00",
+    "simulator_run_id": "run-498f120a5ad641529436467c73039841",
     "tenant_id": "T/SHAAN7/001",
-    "trace_id": "tsim-run-067ffd2bdc75478ab49ba54e06fe9bbf",
+    "trace_id": "tsim-run-498f120a5ad641529436467c73039841",
     "validated": false
   },
-  "commit_sha": "e508953187bd724400e6c03e720b9e6946b51fef",
+  "commit_sha": "4f97b9da8ada9872516d737d5e259258d298fb3e",
   "er_id": "ER-001",
   "event_type_id": "pr.large_change_set",
   "expected_result": {
@@ -26,11 +26,11 @@
     "canonical_policy_receipt_created": false,
     "condition_evaluations": [
       {
-        "actual": 50,
+        "actual": 151,
         "condition_id": "SYNTHETIC_ER001_REVIEW_FILES_CHANGED_GT_50",
         "field": "files_changed",
         "operator": "gt",
-        "result": false,
+        "result": true,
         "threshold": 50,
         "unit": "count"
       },
@@ -60,14 +60,14 @@
           "SYNTHETIC_ER001_REVIEW_LINES_CHANGED_GT_1000",
           "SYNTHETIC_ER001_REVIEW_SERVICES_MODULES_TOUCHED_GTE_3"
         ],
-        "result": false
+        "result": true
       },
       {
-        "actual": 50,
+        "actual": 151,
         "condition_id": "SYNTHETIC_ER001_DENY_FILES_CHANGED_GT_150",
         "field": "files_changed",
         "operator": "gt",
-        "result": false,
+        "result": true,
         "threshold": 150,
         "unit": "count"
       },
@@ -83,7 +83,7 @@
       {
         "authoritative_execution_result": false,
         "condition_id": "SYNTHETIC_ER001_DENY_ANY",
-        "condition_match_result": false,
+        "condition_match_result": true,
         "execution_guard": "release_manager_approval_relationship_requires_authoritative_definition",
         "execution_guard_satisfied": false,
         "logic": "any",
@@ -94,50 +94,56 @@
       }
     ],
     "condition_trace_namespace": "synthetic_fixture",
-    "controlling_condition_group_id": "SYNTHETIC_ER001_NO_REVIEW_OR_DENY_CONDITION_MATCHED",
-    "deny_condition_match": false,
+    "controlling_condition_group_id": null,
+    "deny_condition_match": true,
     "deny_execution_guard_satisfied": false,
     "effective_blocked_state": "not_blocked",
     "enforcement_mode": "shadow",
     "evaluation_scope": "synthetic_er001_source_rule_only",
     "evidence_package_requirement_status": "not_resolved_from_master_threshold",
-    "hypothetical_policy_outcome": "allow",
-    "hypothetical_runtime_severity": "pass",
+    "hypothetical_policy_outcome": null,
+    "hypothetical_runtime_severity": null,
     "llm_response_requirement_status": "not_resolved_from_master_threshold",
-    "matched_outcome_condition_group_ids": [],
+    "matched_outcome_condition_group_ids": [
+      "SYNTHETIC_ER001_REVIEW_ANY",
+      "SYNTHETIC_ER001_DENY_ANY"
+    ],
     "outcome_resolution": {
       "candidate_outcomes": [
-        "allow"
+        "human_review_required",
+        "deny"
       ],
       "canonical_overlap_precedence_defined_in_er001_source": false,
       "compiled_rule_ir_verified": false,
       "deny_execution_guard": "release_manager_approval_relationship_requires_authoritative_definition",
       "deny_execution_guard_satisfied": false,
       "release_manager_approval_relationship_status": "unresolved_for_production",
-      "release_manager_approval_value": true,
+      "release_manager_approval_value": false,
       "release_manager_approval_value_scope": "synthetic_noncontrolling_context",
       "resolution_scope": "synthetic_source_rule_isolation",
-      "resolution_status": "single_unambiguous_result",
-      "selected_hypothetical_outcome": "allow"
+      "resolution_status": "review_and_deny_condition_overlap_with_unresolved_precedence_and_unsatisfied_approval_relationship_guard",
+      "selected_hypothetical_outcome": null
     },
     "policyEvaluationStatus": "not_executed",
     "policyOutcome": null,
     "receipt_decision": null,
     "runtime_severity": null,
     "simulationEvaluationStatus": "evaluated",
-    "simulation_blocked_state": "not_blocked",
-    "simulation_gate_disposition": "continue",
+    "simulation_blocked_state": "not_selected",
+    "simulation_gate_disposition": "unresolved_requires_approval_contract_and_canonical_precedence",
     "tenant_canonical_production_effect": false,
     "tenant_production_enforcement_applied": false,
-    "true_atomic_predicate_ids": [],
-    "warning_non_blocking": false
+    "true_atomic_predicate_ids": [
+      "SYNTHETIC_ER001_REVIEW_FILES_CHANGED_GT_50",
+      "SYNTHETIC_ER001_DENY_FILES_CHANGED_GT_150"
+    ],
+    "warning_non_blocking": null
   },
   "mapped_er_id": "ER-001",
-  "provider_event_target_sha": "e508953187bd724400e6c03e720b9e6946b51fef",
+  "provider_event_target_sha": "4f97b9da8ada9872516d737d5e259258d298fb3e",
   "recipe_id": "repo-001-block",
   "repository": "Shaan-77/Monitor-Drift-Agent",
-  "scenario_id": "pass",
-  "scenario_marker_storage_commit_sha": "1ffed900ba2240e75f03c2ef0d7dd57321b08695",
+  "scenario_id": "block",
   "seed_facts": {
     "artifact_digest": "${runtime.artifactDigest}",
     "assertion_scope": "validator_only",
@@ -176,7 +182,7 @@
       }
     ],
     "environment": "${runtime.environment}",
-    "evaluation_request_id": "SYNTHETIC-ER001-PASS-EVALUATION-001",
+    "evaluation_request_id": "SYNTHETIC-ER001-BLOCK-EVALUATION-001",
     "event_asserts_large_change_or_policy_failure": false,
     "event_type": "pr.large_change_set.evaluation.requested",
     "event_type_scope": "synthetic_seed_taxonomy",
@@ -186,7 +192,7 @@
       "source_unavailable_outcome": "human_review_required",
       "stale_evidence_outcome": "human_review_required"
     },
-    "files_changed": 50,
+    "files_changed": 151,
     "lines_changed": 1000,
     "production_gating_context": true,
     "provider_binding_contract": {
@@ -198,7 +204,7 @@
     },
     "provider_source_state": "available",
     "release_id": "${runtime.releaseId}",
-    "release_manager_approval": true,
+    "release_manager_approval": false,
     "release_manager_approval_contract": {
       "production_relationship_status": "unresolved_for_production",
       "source_prose_mentions_approval": true,
@@ -232,7 +238,7 @@
     "seed_evidence_contract": {
       "tenant_canonical_production_evidence": false
     },
-    "seed_scenario": "pass",
+    "seed_scenario": "block",
     "service_id": "${runtime.serviceId}",
     "service_module_counting_rule": {
       "production_definition_status": "unresolved_for_production"
@@ -246,8 +252,8 @@
       "required_evidence_missing": false
     }
   },
-  "simulator_run_id": "run-067ffd2bdc75478ab49ba54e06fe9bbf",
+  "simulator_run_id": "run-498f120a5ad641529436467c73039841",
   "tenant_id": "T/SHAAN7/001",
-  "trace_id": "tsim-run-067ffd2bdc75478ab49ba54e06fe9bbf",
-  "workflow_run_id": "run-067ffd2bdc75478ab49ba54e06fe9bbf"
+  "trace_id": "tsim-run-498f120a5ad641529436467c73039841",
+  "workflow_run_id": "run-498f120a5ad641529436467c73039841"
 }
