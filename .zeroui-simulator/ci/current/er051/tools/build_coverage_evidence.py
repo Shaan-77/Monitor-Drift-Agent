@@ -9,9 +9,9 @@ from pathlib import Path
 
 REQUIRED = 80.0
 BASELINE = 80.0
-SCENARIO_ID = 'pass'
-EMIT_COVERAGE_DROPPED = False
-RELEASE_CRITICAL = False
+SCENARIO_ID = 'block'
+EMIT_COVERAGE_DROPPED = True
+RELEASE_CRITICAL = True
 SIMULATOR_FAULT = json.loads('{}')
 EVENT_TYPE_ID = "ci.coverage.dropped"
 EVIDENCE_PATH = Path("coverage-evidence.json")
