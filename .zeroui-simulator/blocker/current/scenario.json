@@ -1,0 +1,256 @@
+{
+  "ci_cd_uat_scenario_evaluation": {
+    "commit_sha": "4a81b0eaf43230186ff24b4156e3d6d6c8298604",
+    "evaluation_context": "uat_scenario",
+    "event_type_id": "pr.large_change_set",
+    "fixture_source": "synthetic_seed",
+    "governance_path": "live_fm1",
+    "mapped_er_id": "ER-001",
+    "provider_event_target_sha": "4a81b0eaf43230186ff24b4156e3d6d6c8298604",
+    "recipe_id": "repo-001-block",
+    "repository": "Shaan-77/Monitor-Drift-Agent",
+    "scenario_id": "warn",
+    "signature": "08bfe4dc8242a700d54faa9b571ab24d770edaaae5d1010eb40f952dab38025c",
+    "signed_at": "2026-08-12T23:55:44.312271+00:00",
+    "simulator_run_id": "run-4e0555b47d34429fb65076ff6549fd88",
+    "tenant_id": "T/SHAAN7/001",
+    "trace_id": "tsim-run-4e0555b47d34429fb65076ff6549fd88",
+    "validated": false
+  },
+  "commit_sha": "4a81b0eaf43230186ff24b4156e3d6d6c8298604",
+  "er_id": "ER-001",
+  "event_type_id": "pr.large_change_set",
+  "expected_result": {
+    "authoritative_policy_outcome_available": false,
+    "blocked_state": "not_blocked",
+    "canonical_policy_receipt_created": false,
+    "condition_evaluations": [
+      {
+        "actual": 51,
+        "condition_id": "SYNTHETIC_ER001_REVIEW_FILES_CHANGED_GT_50",
+        "field": "files_changed",
+        "operator": "gt",
+        "result": true,
+        "threshold": 50,
+        "unit": "count"
+      },
+      {
+        "actual": 1000,
+        "condition_id": "SYNTHETIC_ER001_REVIEW_LINES_CHANGED_GT_1000",
+        "field": "lines_changed",
+        "operator": "gt",
+        "result": false,
+        "threshold": 1000,
+        "unit": "count"
+      },
+      {
+        "actual": 2,
+        "condition_id": "SYNTHETIC_ER001_REVIEW_SERVICES_MODULES_TOUCHED_GTE_3",
+        "field": "services_modules_touched",
+        "operator": "gte",
+        "result": false,
+        "threshold": 3,
+        "unit": "count"
+      },
+      {
+        "condition_id": "SYNTHETIC_ER001_REVIEW_ANY",
+        "logic": "any",
+        "member_condition_ids": [
+          "SYNTHETIC_ER001_REVIEW_FILES_CHANGED_GT_50",
+          "SYNTHETIC_ER001_REVIEW_LINES_CHANGED_GT_1000",
+          "SYNTHETIC_ER001_REVIEW_SERVICES_MODULES_TOUCHED_GTE_3"
+        ],
+        "result": true
+      },
+      {
+        "actual": 51,
+        "condition_id": "SYNTHETIC_ER001_DENY_FILES_CHANGED_GT_150",
+        "field": "files_changed",
+        "operator": "gt",
+        "result": false,
+        "threshold": 150,
+        "unit": "count"
+      },
+      {
+        "actual": 1000,
+        "condition_id": "SYNTHETIC_ER001_DENY_LINES_CHANGED_GT_5000",
+        "field": "lines_changed",
+        "operator": "gt",
+        "result": false,
+        "threshold": 5000,
+        "unit": "count"
+      },
+      {
+        "authoritative_execution_result": false,
+        "condition_id": "SYNTHETIC_ER001_DENY_ANY",
+        "condition_match_result": false,
+        "execution_guard": "release_manager_approval_relationship_requires_authoritative_definition",
+        "execution_guard_satisfied": false,
+        "logic": "any",
+        "member_condition_ids": [
+          "SYNTHETIC_ER001_DENY_FILES_CHANGED_GT_150",
+          "SYNTHETIC_ER001_DENY_LINES_CHANGED_GT_5000"
+        ]
+      }
+    ],
+    "condition_trace_namespace": "synthetic_fixture",
+    "controlling_condition_group_id": "SYNTHETIC_ER001_REVIEW_ANY",
+    "deny_condition_match": false,
+    "deny_execution_guard_satisfied": false,
+    "effective_blocked_state": "not_blocked",
+    "enforcement_mode": "shadow",
+    "evaluation_scope": "synthetic_er001_source_rule_only",
+    "evidence_package_requirement_status": "not_resolved_from_master_threshold",
+    "hypothetical_policy_outcome": "human_review_required",
+    "hypothetical_runtime_severity": "warning",
+    "llm_response_requirement_status": "not_resolved_from_master_threshold",
+    "matched_outcome_condition_group_ids": [
+      "SYNTHETIC_ER001_REVIEW_ANY"
+    ],
+    "outcome_resolution": {
+      "candidate_outcomes": [
+        "human_review_required"
+      ],
+      "canonical_overlap_precedence_defined_in_er001_source": false,
+      "compiled_rule_ir_verified": false,
+      "deny_execution_guard": "release_manager_approval_relationship_requires_authoritative_definition",
+      "deny_execution_guard_satisfied": false,
+      "release_manager_approval_relationship_status": "unresolved_for_production",
+      "release_manager_approval_value": true,
+      "release_manager_approval_value_scope": "synthetic_noncontrolling_context",
+      "resolution_scope": "synthetic_source_rule_isolation",
+      "resolution_status": "single_unambiguous_result",
+      "selected_hypothetical_outcome": "human_review_required"
+    },
+    "policyEvaluationStatus": "not_executed",
+    "policyOutcome": null,
+    "receipt_decision": null,
+    "runtime_severity": null,
+    "simulationEvaluationStatus": "evaluated",
+    "simulation_blocked_state": "not_blocked",
+    "simulation_gate_disposition": "continue_with_warning",
+    "tenant_canonical_production_effect": false,
+    "tenant_production_enforcement_applied": false,
+    "true_atomic_predicate_ids": [
+      "SYNTHETIC_ER001_REVIEW_FILES_CHANGED_GT_50"
+    ],
+    "warning_non_blocking": true
+  },
+  "mapped_er_id": "ER-001",
+  "provider_event_target_sha": "4a81b0eaf43230186ff24b4156e3d6d6c8298604",
+  "recipe_id": "repo-001-block",
+  "repository": "Shaan-77/Monitor-Drift-Agent",
+  "scenario_id": "warn",
+  "seed_facts": {
+    "artifact_digest": "${runtime.artifactDigest}",
+    "assertion_scope": "validator_only",
+    "block_overlap_case": {
+      "canonical_precedence_defined_in_er001_source": false,
+      "deny_condition_matches": true,
+      "deny_execution_guard_satisfied": false,
+      "files_changed": 151,
+      "lines_changed": 1000,
+      "release_manager_approval": false,
+      "release_manager_approval_value_scope": "synthetic_noncontrolling_context",
+      "review_matches": true,
+      "selected_outcome": null,
+      "services_modules_touched": 2
+    },
+    "commit_sha": "${runtime.commitSha}",
+    "deny_implies_review_under_current_source_predicates": {
+      "files_reason": "files_changed > 150 necessarily implies files_changed > 50",
+      "isolated_deny_state_exists": false,
+      "lines_reason": "lines_changed > 5000 necessarily implies lines_changed > 1000"
+    },
+    "deny_operator_boundaries": [
+      {
+        "field": "files_changed",
+        "non_triggering_value": 150,
+        "operator": "gt",
+        "threshold": 150,
+        "triggering_value": 151
+      },
+      {
+        "field": "lines_changed",
+        "non_triggering_value": 5000,
+        "operator": "gt",
+        "threshold": 5000,
+        "triggering_value": 5001
+      }
+    ],
+    "environment": "${runtime.environment}",
+    "evaluation_request_id": "SYNTHETIC-ER001-WARN-EVALUATION-001",
+    "event_asserts_large_change_or_policy_failure": false,
+    "event_type": "pr.large_change_set.evaluation.requested",
+    "event_type_scope": "synthetic_seed_taxonomy",
+    "evidence_default_review_paths": {
+      "invalid_evidence_outcome": "human_review_required",
+      "missing_evidence_outcome": "human_review_required",
+      "source_unavailable_outcome": "human_review_required",
+      "stale_evidence_outcome": "human_review_required"
+    },
+    "files_changed": 51,
+    "lines_changed": 1000,
+    "production_gating_context": true,
+    "provider_binding_contract": {
+      "source_evidence_sources": [
+        "github",
+        "gitlab"
+      ],
+      "specific_provider_to_fact_mapping_defined_by_source": false
+    },
+    "provider_source_state": "available",
+    "release_id": "${runtime.releaseId}",
+    "release_manager_approval": true,
+    "release_manager_approval_contract": {
+      "production_relationship_status": "unresolved_for_production",
+      "source_prose_mentions_approval": true,
+      "structured_deny_predicate_present": false
+    },
+    "release_manager_approval_value_scope": "synthetic_noncontrolling_context",
+    "review_operator_boundaries": [
+      {
+        "field": "files_changed",
+        "non_triggering_value": 50,
+        "operator": "gt",
+        "threshold": 50,
+        "triggering_value": 51
+      },
+      {
+        "field": "lines_changed",
+        "non_triggering_value": 1000,
+        "operator": "gt",
+        "threshold": 1000,
+        "triggering_value": 1001
+      },
+      {
+        "field": "services_modules_touched",
+        "non_triggering_value": 2,
+        "operator": "gte",
+        "threshold": 3,
+        "triggering_value": 3
+      }
+    ],
+    "runtime_input": false,
+    "seed_evidence_contract": {
+      "tenant_canonical_production_evidence": false
+    },
+    "seed_scenario": "warn",
+    "service_id": "${runtime.serviceId}",
+    "service_module_counting_rule": {
+      "production_definition_status": "unresolved_for_production"
+    },
+    "services_modules_touched": 2,
+    "source": "central_er_runtime_seed",
+    "tenant_id": "${runtime.tenantId}",
+    "trigger_id": "ER-001",
+    "warning_contract": {
+      "non_blocking": true,
+      "required_evidence_missing": false
+    }
+  },
+  "simulator_run_id": "run-4e0555b47d34429fb65076ff6549fd88",
+  "tenant_id": "T/SHAAN7/001",
+  "trace_id": "tsim-run-4e0555b47d34429fb65076ff6549fd88",
+  "workflow_run_id": "run-4e0555b47d34429fb65076ff6549fd88"
+}
