@@ -9,7 +9,7 @@ from pathlib import Path
 
 REQUIRED = 80.0
 BASELINE = 80.0
-SCENARIO_ID = 'runtime_not_ready'
+SCENARIO_ID = 'setup_needed'
 EMIT_COVERAGE_DROPPED = False
 RELEASE_CRITICAL = None
 SIMULATOR_FAULT = json.loads('{}')
