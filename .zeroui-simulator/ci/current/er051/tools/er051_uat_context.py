@@ -398,5 +398,112 @@ def attach_er051_uat_evaluation_to_envelope(
         tenant_id=tenant_id,
         mapped_er_id=ER051_MAPPED_ER_ID,
         event_type_id=ER051_EVENT_TYPE_ID,
-        recipe_id=_text(scenario.get("recipe_id")) or ER051_RECIPE_ID,
+        recipe_id=ER051_RECIPE_ID,
     )
+
+
+_UAT_OPERATIONAL_OUTCOMES = frozenset({"setup_needed", "runtime_not_ready", "system_error"})
+
+
+def governance_resolve_operational_outcome(
+    response: Mapping[str, Any],
+    pick_fn: Any,
+) -> str | None:
+    decision = str(
+        pick_fn(
+            response,
+            "decision_outcome",
+            "decision.decision_outcome",
+            "projections.ci_response.decision_outcome",
+        )
+        or ""
+    ).strip().lower()
+    if decision in _UAT_OPERATIONAL_OUTCOMES:
+        return decision
+    for path in (
+        "effective_scenario_outcome",
+        "policy_evaluation_status",
+        "projections.ci_response.effective_scenario_outcome",
+        "projections.ci_response.policy_evaluation_status",
+        "payload.ci_cd_uat_scenario_evaluation.policy_evaluation_status",
+        "payload.er051_uat_scenario_evaluation.policy_evaluation_status",
+    ):
+        value = str(pick_fn(response, path) or "").strip().lower()
+        if value in _UAT_OPERATIONAL_OUTCOMES:
+            return value
+    return None
+
+
+def governance_resolve_operational_reason(
+    response: Mapping[str, Any],
+    pick_fn: Any,
+) -> str:
+    for path in (
+        "operational_reason",
+        "failure_code",
+        "projections.ci_response.operational_reason",
+        "projections.ci_response.failure_code",
+        "payload.ci_cd_uat_scenario_evaluation.failure_code",
+        "payload.er051_uat_scenario_evaluation.failure_code",
+        "decision_reason",
+        "projections.ci_response.decision_reason",
+    ):
+        value = str(pick_fn(response, path) or "").strip()
+        if not value:
+            continue
+        for part in value.split(";"):
+            token = part.strip()
+            if token.startswith("failure_code="):
+                code = token.split("=", 1)[1].strip()
+                if code:
+                    return code
+        if path.endswith("decision_reason"):
+            continue
+        return value
+    return "Controlled operational scenario outcome."
+
+
+def governance_enforce_operational_outcome_if_present(
+    response: Mapping[str, Any],
+    *,
+    pick_fn: Any,
+    write_summary_fn: Any,
+    er: str,
+    blocker_count: int,
+    summary_fields: Mapping[str, Any],
+) -> bool:
+    outcome = governance_resolve_operational_outcome(response, pick_fn)
+    if outcome not in _UAT_OPERATIONAL_OUTCOMES:
+        return False
+    if blocker_count != 0:
+        write_summary_fn(
+            "❌ ZeroUI governance check failed.",
+            "Operational scenario must not create blockers",
+            dict(summary_fields),
+        )
+        print(
+            f"::error title=ZeroUI governance check failed::"
+            f"Operational scenario {outcome} reported active blockers."
+        )
+        raise SystemExit(1)
+    reason = governance_resolve_operational_reason(response, pick_fn)
+    fields = dict(summary_fields)
+    fields["Decision"] = outcome
+    fields["Reason"] = reason
+    titles = {
+        "setup_needed": "Setup needed",
+        "runtime_not_ready": "Runtime not ready",
+        "system_error": "System error",
+    }
+    title = titles.get(outcome, outcome)
+    write_summary_fn(
+        f"ℹ️ ZeroUI governance recorded {title}.",
+        f"Controlled {outcome} outcome",
+        fields,
+    )
+    print(
+        f"::notice title=ZeroUI governance {title}::ZeroUI returned {outcome} for {er}. "
+        f"Reason: {reason}. Receipt written. Active blockers: {blocker_count}."
+    )
+    print(f"ZeroUI governance recorded controlled operational outcome: {outcome}.")
+    return True

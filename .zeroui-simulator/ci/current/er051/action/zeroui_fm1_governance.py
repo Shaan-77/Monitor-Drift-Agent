@@ -568,6 +568,31 @@ def enforce_response(response: Dict[str, Any]) -> None:
         )
         raise SystemExit(1)
 
+    try:
+        from er051_uat_context import governance_enforce_operational_outcome_if_present
+
+        if governance_enforce_operational_outcome_if_present(
+            response,
+            pick_fn=pick,
+            write_summary_fn=write_summary,
+            er=str(er or ""),
+            blocker_count=blocker_count,
+            summary_fields=summary_fields,
+        ):
+            return
+    except ImportError:
+        operational = str(decision or "").strip().lower()
+        if operational in {"setup_needed", "runtime_not_ready", "system_error"} and blocker_count == 0:
+            write_summary(
+                f"ℹ️ ZeroUI governance recorded {operational}.",
+                f"Controlled {operational} outcome",
+                summary_fields,
+            )
+            print(
+                f"::notice title=ZeroUI governance operational::ZeroUI returned {operational} for {er}."
+            )
+            return
+
     if cli_exit_code not in (None, 0):
         write_summary("❌ ZeroUI governance blocked this pipeline.", "CLI exit code indicates block", summary_fields)
         print("::error title=ZeroUI governance blocked::FM-1 cli_exit_code requires pipeline failure.")
