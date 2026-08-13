@@ -1,0 +1,14 @@
+{
+  "er_id": "ER-001",
+  "event_type": "pr.large_change_set",
+  "expected_er": "ER-001",
+  "expected_policy_outcome": "human_review_required",
+  "expected_receipt_decision": "",
+  "expected_runtime_severity": "warning",
+  "files_changed": 51,
+  "lines_changed": 1000,
+  "release_manager_approval": true,
+  "run_id": "run-5903794574b84814afa43800bb85f303",
+  "scenario": "warn",
+  "scenario_id": "warn"
+}
