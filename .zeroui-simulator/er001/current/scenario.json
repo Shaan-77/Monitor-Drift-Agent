@@ -1,0 +1,14 @@
+{
+  "er_id": "ER-001",
+  "event_type": "pr.large_change_set",
+  "expected_er": "ER-001",
+  "expected_policy_outcome": "block",
+  "expected_receipt_decision": "",
+  "expected_runtime_severity": "",
+  "files_changed": 151,
+  "lines_changed": 1000,
+  "release_manager_approval": false,
+  "run_id": "run-dd1e94469acf4432a65dfc15c8feab67",
+  "scenario": "block",
+  "scenario_id": "block"
+}
