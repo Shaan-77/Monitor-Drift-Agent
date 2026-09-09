@@ -8,8 +8,7 @@ at regular intervals and store them in the PostgreSQL database.
 # Initialize error capture early to catch all terminal errors
 try:
     from utils.error_capture import initialize_error_capture
-    import os
-    _error_log_file = os.getenv("ERROR_LOG_FILE", "errors.log")
+    import os    _error_log_file = os.getenv("ERROR_LOG_FILE", "errors.log")
     initialize_error_capture(_error_log_file)
 except Exception:
     # If error capture fails, continue without it
