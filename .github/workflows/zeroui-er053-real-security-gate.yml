@@ -1,0 +1,57 @@
+name: ZeroUI ER-053 Real Security Gate
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  zeroui-er053-real-security-gate:
+    name: ZeroUI/FM-1 ER-053 Real Security Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install Bandit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install bandit
+
+      - name: Run Bandit on changed Python files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch origin main --depth=1
+
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD -- '*.py' || true)
+
+          echo "Changed Python files:"
+          echo "${CHANGED_FILES}"
+
+          if [ -z "${CHANGED_FILES}" ]; then
+            echo '{"results":[],"metrics":{}}' > bandit-results.json
+          else
+            bandit ${CHANGED_FILES} -f json -o bandit-results.json || true
+          fi
+
+          echo "Bandit evidence:"
+          cat bandit-results.json
+
+      - name: ZeroUI governance gate
+        uses: ./.github/actions/zeroui-fm1-governance
+        with:
+          evidence_file: bandit-results.json
+          evidence_format: bandit
+        env:
+          FM1_BASE_URL: ${{ vars.FM1_BASE_URL }}
+          FM1_SIGNAL_INTAKE_AUTH_TOKEN: ${{ secrets.FM1_SIGNAL_INTAKE_AUTH_TOKEN }}

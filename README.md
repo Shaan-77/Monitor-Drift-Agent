@@ -2,14 +2,15 @@
 
 A comprehensive monitoring and anomaly detection agent for system metrics and cloud usage, with automated alerting and optional self-healing capabilities.
 
-## Overview
+## Overviewd
 
+z
 The Monitor/Drift Agent is designed to:
 
 - Collect system metrics (CPU, memory, disk, network) and cloud usage metrics
 - Detect anomalies using threshold-based and machine learning methods
 - Enforce policies for monitoring and alerting
-- Send alerts through multiple channels (email, Slack, SMS)
+- Send alerts dthrough multiple channels (email, Slack, SMS)
 - Optionally perform self-healing actions (auto-scaling, shutdown)
   asldjf
 
