@@ -2,7 +2,7 @@
 
 A comprehensive monitoring and anomaly detection agent for system metrics and cloud usage, with automated alerting and optional self-healing capabilities.
 
-## Overview
+## Overviewd
 
 The Monitor/Drift Agent is designed to:
 
